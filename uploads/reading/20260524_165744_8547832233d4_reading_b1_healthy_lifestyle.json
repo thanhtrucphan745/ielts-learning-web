@@ -1,0 +1,57 @@
+{
+  "title": "Reading B1 - A Healthy Lifestyle",
+  "description": "Practice reading test about health and daily habits",
+  "passage": "Many people believe that living a healthy lifestyle is difficult, but small daily habits can make a big difference. Eating fresh fruit and vegetables, drinking enough water, and sleeping for seven to eight hours each night can improve both physical and mental health. Exercise is also important. People do not need to go to the gym every day; walking, cycling, or playing a sport with friends can help the body stay active. Another useful habit is reducing screen time before bed because it can help people sleep better. A healthy lifestyle is not about being perfect, but about making better choices every day.",
+  "questions": [
+    {
+      "question": "What can small daily habits do?",
+      "options": [
+        "Make life more expensive",
+        "Make a big difference",
+        "Stop people from sleeping",
+        "Replace all exercise"
+      ],
+      "answer": 1
+    },
+    {
+      "question": "How many hours of sleep are recommended in the passage?",
+      "options": [
+        "Four to five hours",
+        "Five to six hours",
+        "Seven to eight hours",
+        "Ten to twelve hours"
+      ],
+      "answer": 2
+    },
+    {
+      "question": "Which activity is mentioned as a form of exercise?",
+      "options": [
+        "Watching television",
+        "Walking",
+        "Eating snacks",
+        "Reading in bed"
+      ],
+      "answer": 1
+    },
+    {
+      "question": "Why should people reduce screen time before bed?",
+      "options": [
+        "To sleep better",
+        "To eat more food",
+        "To avoid walking",
+        "To study less"
+      ],
+      "answer": 0
+    },
+    {
+      "question": "What is a healthy lifestyle mainly about?",
+      "options": [
+        "Being perfect all the time",
+        "Going to the gym every day",
+        "Making better choices every day",
+        "Never using a phone"
+      ],
+      "answer": 2
+    }
+  ]
+}

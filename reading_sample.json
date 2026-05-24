@@ -1,0 +1,27 @@
+{
+  "title": "Reading B1",
+  "description": "Diagnostic reading test with explanations",
+  "passage": "The London Eye, also known as the Millennium Wheel, is a giant observation wheel located on the South Bank of the River Thames in London. It was opened to the public on March 9, 2000.",
+  "questions": [
+    {
+      "question": "When was the London Eye opened to the public?",
+      "options": [
+        "March 9, 2000",
+        "March 9, 2001",
+        "March 9, 1999"
+      ],
+      "answer": 0,
+      "explanation": "The passage says it was opened to the public on March 9, 2000."
+    },
+    {
+      "question": "How many passenger capsules does the London Eye have?",
+      "options": [
+        "25",
+        "32",
+        "30"
+      ],
+      "answer": 1,
+      "explanation": "The London Eye is described as having 32 sealed passenger capsules."
+    }
+  ]
+}

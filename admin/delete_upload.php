@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../auth.php';
+require_once __DIR__ . '/../config.php';
 
 auth_require_role(1);
 
@@ -18,10 +19,23 @@ if ($file === '') {
 
 $uploadsDir = __DIR__ . '/../uploads/' . $skill;
 $path = realpath($uploadsDir . '/' . $file);
+$uploadsRoot = realpath($uploadsDir);
 // Ensure file is inside uploads dir
-if ($path && strpos($path, realpath($uploadsDir)) === 0 && is_file($path)) {
+if ($path && $uploadsRoot !== false && strpos($path, $uploadsRoot) === 0 && is_file($path)) {
     @unlink($path);
     @unlink($path . '.json');
+
+    if (isset($conn) && $conn instanceof mysqli) {
+        if (function_exists('ensure_skill_uploads_table')) {
+            ensure_skill_uploads_table($conn);
+        }
+        $stmt = $conn->prepare('DELETE FROM skill_uploads WHERE skill = ? AND filename = ?');
+        if ($stmt) {
+            $stmt->bind_param('ss', $skill, $file);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
 }
 
 header('Location: add_skill.php?skill=' . urlencode($skill));
