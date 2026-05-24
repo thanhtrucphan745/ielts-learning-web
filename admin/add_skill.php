@@ -11,6 +11,7 @@ if (!in_array($skill, $allowed, true)) {
     $skill = 'reading';
 }
 
+$isReadingSkill = $skill === 'reading';
 $message = '';
 $uploadsDir = __DIR__ . '/../uploads/' . $skill;
 if (!is_dir($uploadsDir)) {
@@ -21,7 +22,52 @@ if (!is_dir($uploadsDir)) {
 
 // file restrictions and DB storage
 $maxSize = 10 * 1024 * 1024; // 10 MB
-$allowedExts = ['pdf','doc','docx','txt','mp3','m4a','wav','jpg','jpeg','png'];
+$allowedExts = $isReadingSkill ? ['json'] : ['pdf','doc','docx','txt','mp3','m4a','wav','jpg','jpeg','png'];
+
+function validate_reading_json_payload(array $payload): array
+{
+    if (!isset($payload['title']) || trim((string) $payload['title']) === '') {
+        return ['ok' => false, 'message' => 'JSON phải có trường title.'];
+    }
+
+    if (!isset($payload['passage']) || trim((string) $payload['passage']) === '') {
+        return ['ok' => false, 'message' => 'JSON phải có trường passage.'];
+    }
+
+    if (!isset($payload['questions']) || !is_array($payload['questions']) || empty($payload['questions'])) {
+        return ['ok' => false, 'message' => 'JSON phải có mảng questions hợp lệ.'];
+    }
+
+    foreach ($payload['questions'] as $index => $question) {
+        if (!is_array($question)) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' không hợp lệ.'];
+        }
+
+        if (!isset($question['question']) || trim((string) $question['question']) === '') {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' thiếu nội dung question.'];
+        }
+
+        if (!isset($question['options']) || !is_array($question['options']) || count($question['options']) < 2) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' phải có ít nhất 2 đáp án.'];
+        }
+
+        if (!array_key_exists('answer', $question) || !is_numeric($question['answer'])) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' thiếu answer hợp lệ.'];
+        }
+
+        if (array_key_exists('explanation', $question) && !is_string($question['explanation'])) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' có explanation không hợp lệ.'];
+        }
+
+        $answer = (int) $question['answer'];
+        $optionCount = count($question['options']);
+        if ($answer < 0 || $answer >= $optionCount || $answer > 3) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' có answer không hợp lệ.'];
+        }
+    }
+
+    return ['ok' => true, 'message' => ''];
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim((string) ($_POST['title'] ?? ''));
@@ -63,41 +109,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
 
         if (!in_array($ext, $allowedExts, true)) {
-            $message = 'Loại file không được phép.';
+            $message = $isReadingSkill ? 'Chỉ được upload file .json cho Reading.' : 'Loại file không được phép.';
         } elseif ($f['size'] > $maxSize) {
             $message = 'Kích thước file vượt quá giới hạn 10MB.';
-        } else {
-            $safeName = preg_replace('/[^a-zA-Z0-9-_\.]/', '_', basename($f['name']));
-            $target = $uploadsDir . '/' . time() . '_' . $safeName;
+        } elseif ($isReadingSkill) {
+            $jsonRaw = @file_get_contents($f['tmp_name']);
+            $payload = json_decode((string) $jsonRaw, true);
+            if (!is_array($payload)) {
+                $message = 'File JSON không hợp lệ: ' . json_last_error_msg();
+            } else {
+                $validation = validate_reading_json_payload($payload);
+                if (!$validation['ok']) {
+                    $message = $validation['message'];
+                } else {
+                    if ($title === '') {
+                        $title = trim((string) ($payload['title'] ?? ''));
+                    }
 
-            // extra mime-type check
+                    if ($description === '') {
+                        $description = trim((string) ($payload['description'] ?? ''));
+                    }
+                }
+            }
+        }
+
+        if ($message === '') {
+            $safeName = preg_replace('/[^a-zA-Z0-9-_\.]/', '_', basename($f['name']));
+            $randomSuffix = function_exists('random_bytes') ? bin2hex(random_bytes(6)) : uniqid('', true);
+            $targetName = date('Ymd_His') . '_' . $randomSuffix . '_' . $safeName;
+            $target = $uploadsDir . '/' . $targetName;
+
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             $mime = $finfo ? finfo_file($finfo, $f['tmp_name']) : '';
-            if ($finfo) finfo_close($finfo);
+            if ($finfo) {
+                finfo_close($finfo);
+            }
 
             if (move_uploaded_file($f['tmp_name'], $target)) {
                 $uploadedBy = (int) (auth_user()['id'] ?? 0);
-                // store metadata JSON sidecar
-                $meta = [
-                    'original_name' => $f['name'],
-                    'stored_name' => basename($target),
-                    'title' => $title,
-                    'description' => $description,
-                    'uploaded_at' => date('c'),
-                    'uploaded_by' => $uploadedBy ?: null,
-                    'mime' => $mime,
-                    'size' => $f['size'],
-                ];
-                @file_put_contents($target . '.json', json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-                // try to insert into DB if available
                 if (isset($conn) && $conn instanceof mysqli) {
                     $stmt = $conn->prepare('INSERT INTO skill_uploads (skill, title, description, filename, original_name, mime, size, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())');
                     if ($stmt) {
                         $skillParam = $skill;
                         $filenameParam = basename($target);
                         $origParam = $f['name'];
-                        $mimeParam = $mime;
+                        $mimeParam = (string) $mime;
                         $sizeParam = (int) $f['size'];
                         $stmt->bind_param('ssssssii', $skillParam, $title, $description, $filenameParam, $origParam, $mimeParam, $sizeParam, $uploadedBy);
                         $stmt->execute();
@@ -114,16 +171,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $files = [];
+$dbMetaByFile = [];
+if ($isReadingSkill && isset($conn) && $conn instanceof mysqli) {
+    $stmt = $conn->prepare('SELECT filename, title, description, original_name, mime, size, uploaded_by, created_at FROM skill_uploads WHERE skill = ? ORDER BY id DESC');
+    if ($stmt) {
+        $readingSkill = 'reading';
+        $stmt->bind_param('s', $readingSkill);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $fileKey = (string) ($row['filename'] ?? '');
+                if ($fileKey !== '' && !isset($dbMetaByFile[$fileKey])) {
+                    $dbMetaByFile[$fileKey] = $row;
+                }
+            }
+        }
+        $stmt->close();
+    }
+}
+
 $dh = @opendir($uploadsDir);
 if ($dh) {
     while (($entry = readdir($dh)) !== false) {
         if ($entry === '.' || $entry === '..') continue;
-        if (substr($entry, -5) === '.json') continue;
-        $metaFile = $uploadsDir . '/' . $entry . '.json';
+        if (!$isReadingSkill && substr($entry, -5) === '.json') continue;
         $meta = null;
-        if (is_file($metaFile)) {
-            $m = @json_decode(@file_get_contents($metaFile), true);
-            if (is_array($m)) $meta = $m;
+        if ($isReadingSkill) {
+            $meta = $dbMetaByFile[$entry] ?? null;
+        } else {
+            $metaFile = $uploadsDir . '/' . $entry . '.json';
+            if (is_file($metaFile)) {
+                $m = @json_decode(@file_get_contents($metaFile), true);
+                if (is_array($m)) $meta = $m;
+            }
         }
         $files[] = [
             'name' => $entry,
@@ -164,7 +245,29 @@ if ($dh) {
             </div>
             <div class="mb-3">
                 <label class="form-label">Chọn file từ máy</label>
-                <input type="file" name="file" class="form-control" required accept=".pdf,.doc,.docx,.txt,.mp3,.m4a,.wav,.jpg,.jpeg,.png" />
+                <input type="file" name="file" class="form-control" required accept="<?php echo $isReadingSkill ? '.json,application/json,text/plain' : '.pdf,.doc,.docx,.txt,.mp3,.m4a,.wav,.jpg,.jpeg,.png'; ?>" />
+                                <?php if ($isReadingSkill): ?>
+                                        <div style="margin-top:10px;padding:12px 14px;border:1px solid #d6d8db;border-radius:8px;background:#f8f9fa;font-size:14px;line-height:1.6;">
+                                                <div><strong>Hướng dẫn JSON Reading</strong></div>
+                                                <div>Chỉ nhận file <strong>.json</strong>.</div>
+                                                <div>File cần có: <strong>title</strong>, <strong>passage</strong>, <strong>questions</strong>.</div>
+                                                <div>Mỗi question cần có: <strong>question</strong>, <strong>options</strong>, <strong>answer</strong>.</div>
+                                                <div><strong>explanation</strong> là tùy chọn.</div>
+                                                <div>answer dùng số thứ tự option: <strong>0 = A</strong>, <strong>1 = B</strong>, <strong>2 = C</strong>, <strong>3 = D</strong>.</div>
+                                                <pre style="margin:10px 0 0;white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:10px;">{
+    "title": "Reading B1",
+    "passage": "This is a short reading passage.",
+    "questions": [
+        {
+            "question": "What is the passage about?",
+            "options": ["A test", "A song", "A movie", "A game"],
+            "answer": 0,
+            "explanation": "The passage talks about a test."
+        }
+    ]
+}</pre>
+                                        </div>
+                                <?php endif; ?>
             </div>
             <button class="btn btn-primary" type="submit">Gửi lên website</button>
         </form>

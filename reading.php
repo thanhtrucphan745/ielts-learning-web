@@ -13,63 +13,255 @@ $avatarPath = !empty($currentUser['avatar']) ? $currentUser['avatar'] : '';
 $avatarUrl = $avatarPath !== '' ? $avatarPath : '';
 $role = isset($currentUser['role']) ? (int) $currentUser['role'] : 0;
 
+function reading_validate_payload(array $payload): array
+{
+    if (!isset($payload['title']) || trim((string) $payload['title']) === '') {
+        return ['ok' => false, 'message' => 'Thiếu title trong file JSON.'];
+    }
+
+    if (!isset($payload['passage']) || trim((string) $payload['passage']) === '') {
+        return ['ok' => false, 'message' => 'Thiếu passage trong file JSON.'];
+    }
+
+    if (!isset($payload['questions']) || !is_array($payload['questions']) || empty($payload['questions'])) {
+        return ['ok' => false, 'message' => 'Thiếu mảng questions hợp lệ.'];
+    }
+
+    foreach ($payload['questions'] as $index => $question) {
+        if (!is_array($question)) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' không hợp lệ.'];
+        }
+
+        if (!isset($question['question']) || trim((string) $question['question']) === '') {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' thiếu nội dung.'];
+        }
+
+        if (!isset($question['options']) || !is_array($question['options']) || count($question['options']) < 2) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' phải có ít nhất 2 đáp án.'];
+        }
+
+        if (!array_key_exists('answer', $question) || !is_numeric($question['answer'])) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' thiếu answer hợp lệ.'];
+        }
+
+        if (array_key_exists('explanation', $question) && !is_string($question['explanation'])) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' có explanation không hợp lệ.'];
+        }
+
+        $answer = (int) $question['answer'];
+        $optionCount = count($question['options']);
+        if ($answer < 0 || $answer >= $optionCount || $answer > 3) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' có answer không hợp lệ.'];
+        }
+    }
+
+    return ['ok' => true, 'message' => ''];
+}
+
+function reading_band_score(int $correct, int $total): float
+{
+    if ($total <= 0) {
+        return 0.0;
+    }
+
+    $percentage = ($correct / $total) * 100;
+
+    if ($percentage >= 90) {
+        return 7.5;
+    }
+
+    if ($percentage >= 80) {
+        return 6.5;
+    }
+
+    if ($percentage >= 70) {
+        return 6.0;
+    }
+
+    if ($percentage >= 60) {
+        return 5.5;
+    }
+
+    if ($percentage >= 50) {
+        return 5.0;
+    }
+
+    if ($percentage >= 40) {
+        return 4.5;
+    }
+
+    if ($percentage >= 30) {
+        return 4.0;
+    }
+
+    if ($percentage >= 20) {
+        return 3.0;
+    }
+
+    return 2.0;
+}
+
+function reading_option_letter(int $index): string
+{
+    return chr(65 + $index);
+}
+
+function reading_question_explanation(array $question, int $correctAnswer): string
+{
+    $explanation = trim((string) ($question['explanation'] ?? ''));
+    if ($explanation !== '') {
+        return $explanation;
+    }
+
+    $correctLetter = reading_option_letter($correctAnswer);
+    $options = is_array($question['options'] ?? null) ? $question['options'] : [];
+    $correctText = isset($options[$correctAnswer]) ? trim((string) $options[$correctAnswer]) : '';
+
+    if ($correctText !== '') {
+        return 'Giải thích: đáp án đúng là ' . $correctLetter . '. ' . $correctText . '.';
+    }
+
+    return 'Giải thích: đáp án đúng là ' . $correctLetter . '.';
+}
+
+function reading_load_test(mysqli $conn, ?int $uploadId = null): array
+{
+    $uploadsDir = __DIR__ . '/uploads/reading';
+    $records = [];
+
+    if ($uploadId !== null) {
+        $stmt = $conn->prepare('SELECT id, skill, title, description, filename, original_name, mime, size, uploaded_by, created_at FROM skill_uploads WHERE skill = ? AND id = ? LIMIT 1');
+        if (!$stmt) {
+            return ['ok' => false, 'message' => 'Không đọc được dữ liệu bài Reading từ database.'];
+        }
+
+        $skill = 'reading';
+        $stmt->bind_param('si', $skill, $uploadId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $records[] = $row;
+            }
+        }
+        $stmt->close();
+    } else {
+        $stmt = $conn->prepare('SELECT id, skill, title, description, filename, original_name, mime, size, uploaded_by, created_at FROM skill_uploads WHERE skill = ? ORDER BY id DESC LIMIT 50');
+        if (!$stmt) {
+            return ['ok' => false, 'message' => 'Không đọc được dữ liệu bài Reading từ database.'];
+        }
+
+        $skill = 'reading';
+        $stmt->bind_param('s', $skill);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $records[] = $row;
+            }
+        }
+        $stmt->close();
+    }
+
+    foreach ($records as $record) {
+        $storedName = basename((string) ($record['filename'] ?? ''));
+        if ($storedName === '') {
+            continue;
+        }
+
+        $filePath = $uploadsDir . '/' . $storedName;
+        if (!is_file($filePath)) {
+            continue;
+        }
+
+        $raw = @file_get_contents($filePath);
+        $payload = json_decode((string) $raw, true);
+        if (!is_array($payload)) {
+            continue;
+        }
+
+        $validation = reading_validate_payload($payload);
+        if (!$validation['ok']) {
+            continue;
+        }
+
+        return [
+            'ok' => true,
+            'record' => $record,
+            'payload' => $payload,
+            'filePath' => $filePath,
+        ];
+    }
+
+    return ['ok' => false, 'message' => 'Chưa có bài Reading JSON hợp lệ để hiển thị.'];
+}
+
 $bandScore = null;
 $feedback = '';
 $score = 0;
-$practiceSummary = [
-    'attempts' => 0,
-    'bestScore' => 0,
-    'latestScore' => 0,
-    'averageScore' => 0,
-    'bestBandScore' => null,
-];
+$totalQuestions = 0;
+$questionResults = [];
+$submitted = $_SERVER['REQUEST_METHOD'] === 'POST';
+$selectedUploadId = isset($_POST['upload_id']) ? (int) $_POST['upload_id'] : null;
+$readingLoad = reading_load_test($conn, $submitted && $selectedUploadId ? $selectedUploadId : null);
+$readingRecord = $readingLoad['record'] ?? null;
+$readingPayload = $readingLoad['payload'] ?? null;
+$readingError = $readingLoad['message'] ?? '';
+$questions = [];
+$title = 'Reading Diagnostic Test';
+$description = '';
+$passage = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $correctAnswers = ['1_A', '2_B', '3_C', '4_A', '5_B'];
-    $userAnswers = [
-        isset($_POST['q1']) ? $_POST['q1'] : '',
-        isset($_POST['q2']) ? $_POST['q2'] : '',
-        isset($_POST['q3']) ? $_POST['q3'] : '',
-        isset($_POST['q4']) ? $_POST['q4'] : '',
-        isset($_POST['q5']) ? $_POST['q5'] : ''
-    ];
-    
+if ($readingLoad['ok'] ?? false) {
+    $title = (string) ($readingPayload['title'] ?? $title);
+    $description = (string) ($readingPayload['description'] ?? ($readingRecord['description'] ?? ''));
+    $passage = (string) ($readingPayload['passage'] ?? '');
+    $questions = is_array($readingPayload['questions'] ?? null) ? $readingPayload['questions'] : [];
+    $totalQuestions = count($questions);
+}
+
+if ($submitted && ($readingLoad['ok'] ?? false)) {
     $score = 0;
-    for ($i = 0; $i < 5; $i++) {
-        if ($userAnswers[$i] === $correctAnswers[$i]) {
+    foreach ($questions as $index => $question) {
+        $correctAnswer = (int) ($question['answer'] ?? -1);
+        $userAnswer = isset($_POST['answers'][$index]) ? (int) $_POST['answers'][$index] : -1;
+        $questionResults[$index] = [
+            'correctAnswer' => $correctAnswer,
+            'userAnswer' => $userAnswer,
+            'isCorrect' => $userAnswer === $correctAnswer,
+        ];
+        if ($userAnswer === $correctAnswer) {
             $score++;
         }
     }
-    
-    $percentage = ($score / 5) * 100;
+
+    $bandScore = reading_band_score($score, $totalQuestions);
+    $percentage = $totalQuestions > 0 ? ($score / $totalQuestions) * 100 : 0;
+
     if ($percentage >= 80) {
-        $bandScore = 6;
-        $feedback = 'Excellent! You have strong reading comprehension skills (Band 6). You demonstrate accuracy of 70-80% and can understand both main ideas and detailed information clearly. You are ready for advanced IELTS reading passages.';
+        $feedback = 'Bạn làm rất tốt phần Reading. Hãy tiếp tục luyện thêm passage dài hơn và canh thời gian sát hơn.';
     } elseif ($percentage >= 60) {
-        $bandScore = 5;
-        $feedback = 'Good! You have competent reading comprehension skills (Band 5). You understand main ideas with 60-70% accuracy, though you may miss some specific details. Continue practicing with varied texts to strengthen your skills.';
+        $feedback = 'Kết quả ổn định. Bạn đã nắm được ý chính và nên luyện thêm câu hỏi chi tiết.';
     } elseif ($percentage >= 40) {
-        $bandScore = 4;
-        $feedback = 'Fair! You have basic reading comprehension skills (Band 4). You can grasp general information with 50-60% accuracy, but details often confuse you. Focus on vocabulary building and practicing with more complex texts.';
+        $feedback = 'Bạn đã có nền tảng cơ bản, nhưng cần cải thiện kỹ năng tìm keyword và đối chiếu thông tin trong passage.';
     } elseif ($percentage >= 20) {
-        $bandScore = 2;
-        $feedback = 'You need more practice (Band 2-3). You understand very little from the text. Start with simpler materials and build your vocabulary and comprehension strategies gradually.';
+        $feedback = 'Bạn nên luyện thêm skimming, scanning và từ vựng học thuật để tăng độ chính xác.';
     } else {
-        $bandScore = 0;
-        $feedback = 'Keep practicing! Reading comprehension takes time (Band 0-1). We recommend starting with beginner-level materials and reading short articles daily to develop your skills.';
+        $feedback = 'Bạn cần luyện lại từ mức cơ bản. Hãy tập đọc ngắn, đọc chậm và xác định keyword trong câu hỏi trước.';
     }
 
     if ($currentUser && isset($currentUser['id'])) {
-        streak_mark_activity($conn, (int) $currentUser['id'], 'reading', 'diagnostic_test', $score, 5, (float) $bandScore, 20);
-        $practiceSummary = streak_get_practice_summary($conn, (int) $currentUser['id'], 'reading');
+        streak_mark_activity($conn, (int) $currentUser['id'], 'reading', 'json_test', $score, max(1, $totalQuestions), (float) $bandScore, 20);
     }
 }
+
+$avatarUrl = $avatarPath !== '' ? $avatarPath : '';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8">
-    <title>Reading Diagnostic Test - eLEARNING</title>
+    <title><?php echo htmlspecialchars($title, ENT_QUOTES, 'UTF-8'); ?> - eLEARNING</title>
     <base href="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <link href="img/favicon.ico" rel="icon">
@@ -84,8 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="css/style.css" rel="stylesheet">
 </head>
 <body>
-        <?php include __DIR__ . '/nav.php'; ?>
-
+    <?php include __DIR__ . '/nav.php'; ?>
 
     <div id="spinner" class="show bg-white position-fixed translate-middle w-100 vh-100 top-50 start-50 d-flex align-items-center justify-content-center">
         <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
@@ -93,15 +284,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
-    
-
     <div class="container-fluid bg-primary py-5 mb-5 page-header">
         <div class="container py-5">
             <div class="row justify-content-center">
                 <div class="col-lg-10 text-center">
-                    <h1 class="display-3 text-white animated slideInDown">Reading Diagnostic Test</h1>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb justify-content-center">
+                    <h1 class="display-3 text-white animated slideInDown"><?php echo htmlspecialchars($title, ENT_QUOTES, 'UTF-8'); ?></h1>
+                    <p class="text-white mb-0"><?php echo htmlspecialchars($description !== '' ? $description : 'Reading test from uploaded JSON', ENT_QUOTES, 'UTF-8'); ?></p>
+                    <nav aria-label="breadcrumb" class="mt-3">
+                        <ol class="breadcrumb justify-content-center mb-0">
                             <li class="breadcrumb-item"><a class="text-white" href="index.php">Home</a></li>
                             <li class="breadcrumb-item text-white active" aria-current="page">Reading Test</li>
                         </ol>
@@ -113,140 +303,143 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="container-xxl py-5">
         <div class="container">
-            <?php if ($bandScore !== null): ?>
+            <?php if ($readingError !== ''): ?>
+                <div class="row justify-content-center mb-4">
+                    <div class="col-lg-10">
+                        <div class="alert alert-warning border-0 shadow-sm"><?php echo htmlspecialchars($readingError, ENT_QUOTES, 'UTF-8'); ?></div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($submitted && ($readingLoad['ok'] ?? false)): ?>
                 <div class="row justify-content-center mb-5">
                     <div class="col-lg-8">
                         <div class="card border-primary shadow-lg">
                             <div class="card-body text-center p-5">
-                                <h2 class="card-title text-primary mb-4">Your Band Score</h2>
-                                <div class="display-1 text-primary fw-bold mb-3"><?php echo htmlspecialchars($bandScore, ENT_QUOTES, 'UTF-8'); ?></div>
+                                <h2 class="card-title text-primary mb-3">Kết quả bài làm</h2>
+                                <div class="display-1 text-primary fw-bold mb-2"><?php echo htmlspecialchars(number_format((float) $bandScore, 1), ENT_QUOTES, 'UTF-8'); ?></div>
+                                <div class="h5 text-muted mb-4"><?php echo htmlspecialchars((string) $score, ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) $totalQuestions, ENT_QUOTES, 'UTF-8'); ?> câu đúng</div>
                                 <div class="row g-3 justify-content-center mb-4 text-start">
                                     <div class="col-md-4">
                                         <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Lượt làm bài</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $practiceSummary['attempts'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                            <div class="text-muted small text-uppercase">Số câu đúng</div>
+                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $score, ENT_QUOTES, 'UTF-8'); ?></div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Điểm hiện tại</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $score, ENT_QUOTES, 'UTF-8'); ?>/5</div>
+                                            <div class="text-muted small text-uppercase">Tổng câu</div>
+                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $totalQuestions, ENT_QUOTES, 'UTF-8'); ?></div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Điểm tốt nhất</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $practiceSummary['bestScore'], ENT_QUOTES, 'UTF-8'); ?>/5</div>
+                                            <div class="text-muted small text-uppercase">Band score</div>
+                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars(number_format((float) $bandScore, 1), ENT_QUOTES, 'UTF-8'); ?></div>
                                         </div>
                                     </div>
                                 </div>
                                 <p class="card-text fs-5 mb-4"><?php echo htmlspecialchars($feedback, ENT_QUOTES, 'UTF-8'); ?></p>
-                                <a href="reading.php" class="btn btn-primary me-2">Retake Test</a>
+                                <a href="reading.php" class="btn btn-primary me-2">Làm lại bài mới nhất</a>
                                 <a href="index.php" class="btn btn-outline-primary">Back to Home</a>
                             </div>
                         </div>
                     </div>
                 </div>
-            <?php else: ?>
-                <div class="row justify-content-center">
-                    <div class="col-lg-8">
-                        <div class="bg-light rounded p-4">
-                            <h3 class="mb-4">Read the passage and answer the questions</h3>
-                            
+            <?php endif; ?>
+
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <div class="bg-light rounded p-4 p-lg-5 shadow-sm">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+                            <div>
+                                <h3 class="mb-1">Read the passage and answer the questions</h3>
+                                <p class="text-muted mb-0">Bài Reading được lấy từ file JSON mới nhất trong database.</p>
+                            </div>
+                            <?php if ($readingLoad['ok'] ?? false): ?>
+                                <div class="text-md-end mt-3 mt-md-0">
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2">Latest test #<?php echo htmlspecialchars((string) $readingRecord['id'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if (!($readingLoad['ok'] ?? false)): ?>
+                            <div class="alert alert-info mb-0">
+                                Chưa có bài Reading JSON hợp lệ trong uploads/reading. Hãy upload một file JSON qua admin/add_skill.php?skill=reading.
+                            </div>
+                        <?php else: ?>
                             <div class="card mb-4 border-0 shadow-sm">
                                 <div class="card-body">
-                                    <p><strong>Passage:</strong></p>
-                                    <p>The London Eye, also known as the Millennium Wheel, is a giant observation wheel located on the South Bank of the River Thames in London. It was opened to the public on March 9, 2000, and has become one of the most iconic landmarks in London. The wheel is 443 feet tall and offers panoramic views of the city from its 32 sealed passenger capsules. Each capsule can hold up to 25 people. A complete rotation takes approximately 30 minutes, allowing visitors to enjoy the sights at a leisurely pace. The London Eye is open daily and attracts millions of visitors from around the world each year.</p>
+                                    <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-3">
+                                        <div>
+                                            <h4 class="mb-1"><?php echo htmlspecialchars($title, ENT_QUOTES, 'UTF-8'); ?></h4>
+                                            <?php if ($description !== ''): ?>
+                                                <p class="text-muted mb-0"><?php echo htmlspecialchars($description, ENT_QUOTES, 'UTF-8'); ?></p>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="text-muted small align-self-md-end">
+                                            Uploaded file: <?php echo htmlspecialchars((string) ($readingRecord['original_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+                                        </div>
+                                    </div>
+                                    <p class="mb-0" style="white-space: pre-line;"><?php echo htmlspecialchars($passage, ENT_QUOTES, 'UTF-8'); ?></p>
                                 </div>
                             </div>
 
                             <form method="post" action="reading.php">
-                                <div class="mb-4">
-                                    <p><strong>1. When was the London Eye opened to the public?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_A" value="1_A" required>
-                                        <label class="form-check-label" for="q1_A">A. March 9, 2000</label>
+                                <input type="hidden" name="upload_id" value="<?php echo htmlspecialchars((string) $readingRecord['id'], ENT_QUOTES, 'UTF-8'); ?>">
+                                <?php foreach ($questions as $index => $question): ?>
+                                    <?php
+                                        $questionText = (string) ($question['question'] ?? '');
+                                        $options = is_array($question['options'] ?? null) ? $question['options'] : [];
+                                        $questionNumber = $index + 1;
+                                        $result = $questionResults[$index] ?? null;
+                                        $isAnswered = $result !== null && (int) $result['userAnswer'] >= 0;
+                                        $isCorrect = $result !== null ? (bool) $result['isCorrect'] : false;
+                                    ?>
+                                    <div class="mb-4 p-3 bg-white rounded border <?php echo $submitted ? ($isCorrect ? 'border-success' : 'border-danger') : ''; ?>">
+                                        <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                                            <p class="fw-bold mb-3"><?php echo htmlspecialchars($questionNumber . '. ' . $questionText, ENT_QUOTES, 'UTF-8'); ?></p>
+                                            <?php if ($submitted && $isAnswered): ?>
+                                                <span class="badge <?php echo $isCorrect ? 'bg-success' : 'bg-danger'; ?> align-self-md-start">
+                                                    <?php echo $isCorrect ? 'Correct' : 'Incorrect'; ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php foreach ($options as $optionIndex => $optionText): ?>
+                                            <?php
+                                                $optionLetter = reading_option_letter((int) $optionIndex);
+                                                $isSelected = isset($_POST['answers'][$index]) && (string) $_POST['answers'][$index] === (string) $optionIndex;
+                                                $isRightAnswer = $submitted && $result !== null && (int) $result['correctAnswer'] === (int) $optionIndex;
+                                                $optionClass = $submitted ? ($isRightAnswer ? 'text-success fw-semibold' : ($isSelected ? 'text-danger' : '')) : '';
+                                            ?>
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="radio" name="answers[<?php echo htmlspecialchars((string) $index, ENT_QUOTES, 'UTF-8'); ?>]" id="q<?php echo htmlspecialchars((string) $questionNumber, ENT_QUOTES, 'UTF-8'); ?>_<?php echo htmlspecialchars($optionLetter, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars((string) $optionIndex, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $optionIndex === 0 ? 'required' : ''; ?> <?php echo $isSelected ? 'checked' : ''; ?>>
+                                                <label class="form-check-label <?php echo htmlspecialchars($optionClass, ENT_QUOTES, 'UTF-8'); ?>" for="q<?php echo htmlspecialchars((string) $questionNumber, ENT_QUOTES, 'UTF-8'); ?>_<?php echo htmlspecialchars($optionLetter, ENT_QUOTES, 'UTF-8'); ?>">
+                                                    <?php echo htmlspecialchars($optionLetter . '. ' . (string) $optionText, ENT_QUOTES, 'UTF-8'); ?>
+                                                </label>
+                                            </div>
+                                        <?php endforeach; ?>
+                                        <?php if ($submitted && $result !== null): ?>
+                                            <div class="mt-3 small <?php echo $isCorrect ? 'text-success' : 'text-danger'; ?>">
+                                                <?php if ($isCorrect): ?>
+                                                    Đáp án đúng: <?php echo htmlspecialchars(reading_option_letter((int) $result['correctAnswer']), ENT_QUOTES, 'UTF-8'); ?>.
+                                                <?php else: ?>
+                                                    Bạn chọn <?php echo htmlspecialchars($result['userAnswer'] >= 0 ? reading_option_letter((int) $result['userAnswer']) : 'chưa chọn', ENT_QUOTES, 'UTF-8'); ?>, đáp án đúng là <?php echo htmlspecialchars(reading_option_letter((int) $result['correctAnswer']), ENT_QUOTES, 'UTF-8'); ?>.
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="mt-2 small text-muted">
+                                                <?php echo htmlspecialchars(reading_question_explanation($question, (int) $result['correctAnswer']), ENT_QUOTES, 'UTF-8'); ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_B" value="1_B">
-                                        <label class="form-check-label" for="q1_B">B. March 9, 2001</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_C" value="1_C">
-                                        <label class="form-check-label" for="q1_C">C. March 9, 1999</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>2. How many passenger capsules does the London Eye have?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_A" value="2_A" required>
-                                        <label class="form-check-label" for="q2_A">A. 25</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_B" value="2_B">
-                                        <label class="form-check-label" for="q2_B">B. 32</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_C" value="2_C">
-                                        <label class="form-check-label" for="q2_C">C. 30</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>3. What is the height of the London Eye?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_A" value="3_A" required>
-                                        <label class="form-check-label" for="q3_A">A. 350 feet</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_B" value="3_B">
-                                        <label class="form-check-label" for="q3_B">B. 400 feet</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_C" value="3_C">
-                                        <label class="form-check-label" for="q3_C">C. 443 feet</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>4. How long does a complete rotation of the London Eye take?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_A" value="4_A" required>
-                                        <label class="form-check-label" for="q4_A">A. Approximately 30 minutes</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_B" value="4_B">
-                                        <label class="form-check-label" for="q4_B">B. Approximately 15 minutes</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_C" value="4_C">
-                                        <label class="form-check-label" for="q4_C">C. Approximately 60 minutes</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>5. Where is the London Eye located?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_A" value="5_A" required>
-                                        <label class="form-check-label" for="q5_A">A. North Bank of the Thames</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_B" value="5_B">
-                                        <label class="form-check-label" for="q5_B">B. South Bank of the Thames</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_C" value="5_C">
-                                        <label class="form-check-label" for="q5_C">C. East Bank of the Thames</label>
-                                    </div>
-                                </div>
+                                <?php endforeach; ?>
 
                                 <button class="btn btn-primary py-3 px-5" type="submit">Submit Test</button>
                             </form>
-                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
 
