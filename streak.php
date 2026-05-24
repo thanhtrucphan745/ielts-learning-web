@@ -181,3 +181,53 @@ function streak_get_status(mysqli $conn, int $userId): array
 
     return $status;
 }
+
+function streak_get_practice_summary(mysqli $conn, int $userId, string $skill): array
+{
+    $summary = [
+        'attempts' => 0,
+        'bestScore' => 0,
+        'latestScore' => 0,
+        'bestBandScore' => null,
+        'averageScore' => 0,
+    ];
+
+    if ($userId <= 0 || $skill === '') {
+        return $summary;
+    }
+
+    streak_ensure_tables($conn);
+
+    $sql = "
+        SELECT
+            COUNT(*) AS attempts,
+            COALESCE(MAX(score), 0) AS best_score,
+            COALESCE(AVG(score), 0) AS average_score,
+            COALESCE(MAX(band_score), 0) AS best_band_score,
+            COALESCE((SELECT score FROM study_sessions WHERE user_id = ? AND skill = ? ORDER BY created_at DESC, id DESC LIMIT 1), 0) AS latest_score
+        FROM study_sessions
+        WHERE user_id = ? AND skill = ?
+    ";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return $summary;
+    }
+
+    $stmt->bind_param('isis', $userId, $skill, $userId, $skill);
+    $stmt->execute();
+    $row = $stmt->get_result()?->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        return $summary;
+    }
+
+    $summary['attempts'] = (int) ($row['attempts'] ?? 0);
+    $summary['bestScore'] = (int) ($row['best_score'] ?? 0);
+    $summary['latestScore'] = (int) ($row['latest_score'] ?? 0);
+    $summary['averageScore'] = round((float) ($row['average_score'] ?? 0), 1);
+    $summary['bestBandScore'] = isset($row['best_band_score']) ? (float) $row['best_band_score'] : null;
+
+    return $summary;
+}

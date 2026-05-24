@@ -16,6 +16,13 @@ $role = isset($currentUser['role']) ? (int) $currentUser['role'] : 0;
 $bandScore = null;
 $feedback = '';
 $score = 0;
+$practiceSummary = [
+    'attempts' => 0,
+    'bestScore' => 0,
+    'latestScore' => 0,
+    'averageScore' => 0,
+    'bestBandScore' => null,
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $correctAnswers = ['1_B', '2_A', '3_B', '4_C', '5_A'];
@@ -54,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($currentUser && isset($currentUser['id'])) {
         streak_mark_activity($conn, (int) $currentUser['id'], 'listening', 'diagnostic_test', $score, 5, (float) $bandScore, 20);
+        $practiceSummary = streak_get_practice_summary($conn, (int) $currentUser['id'], 'listening');
     }
 }
 ?>
@@ -82,50 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
-    <nav class="navbar navbar-expand-lg bg-white navbar-light shadow sticky-top p-0">
-        <a href="index.php" class="navbar-brand d-flex align-items-center px-4 px-lg-5">
-            <h2 class="m-0 text-primary"><i class="fa fa-book me-3"></i>eLEARNING</h2>
-        </a>
-        <button type="button" class="navbar-toggler me-4" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarCollapse">
-            <div class="navbar-nav ms-auto p-4 p-lg-0">
-                <a href="index.php" class="nav-item nav-link">Home</a>
-                <a href="about.php" class="nav-item nav-link">About</a>
-                <a href="contact.php" class="nav-item nav-link">Contact</a>
-            </div>
-            <div class="d-none d-lg-flex align-items-center gap-2 px-4 px-lg-5">
-                <?php if ($currentUser): ?>
-                    <div class="dropdown">
-                        <a class="d-flex align-items-center text-decoration-none dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <?php if ($avatarUrl !== ''): ?>
-                                <img src="<?php echo htmlspecialchars($avatarUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="Avatar" class="rounded-circle me-2" style="width:44px;height:44px;object-fit:cover;">
-                            <?php else: ?>
-                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" style="width:44px;height:44px;font-weight:700;">
-                                    <?php echo htmlspecialchars($avatarText, ENT_QUOTES, 'UTF-8'); ?>
-                                </div>
-                            <?php endif; ?>
-                            <span class="fw-bold text-dark">Hi, <?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?></span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
-                            <li><a class="dropdown-item" href="profile.php"><i class="fas fa-user-circle me-2 text-primary"></i>Hồ sơ cá nhân</a></li>
-                            <li><a class="dropdown-item" href="practice.php"><i class="fas fa-list-alt me-2 text-primary"></i>Quản lý tin đăng</a></li>
-                            <?php if ($role === 1): ?>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item fw-semibold text-primary" href="admin/index.php"><i class="fas fa-shield-alt me-2"></i>Quản trị hệ thống</a></li>
-                            <?php endif; ?>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-power-off me-2"></i>Đăng xuất</a></li>
-                        </ul>
-                    </div>
-                <?php else: ?>
-                    <a href="login.php" class="btn btn-outline-primary py-2 px-4">Login</a>
-                    <a href="register.php" class="btn btn-primary py-2 px-4">Đăng ký<i class="fa fa-arrow-right ms-3"></i></a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </nav>
+        <?php include __DIR__ . '/nav.php'; ?>
 
     <div class="container-fluid bg-primary py-5 mb-5 page-header">
         <div class="container py-5">
@@ -152,6 +117,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <div class="card-body text-center p-5">
                                 <h2 class="card-title text-primary mb-4">Your Band Score</h2>
                                 <div class="display-1 text-primary fw-bold mb-3"><?php echo htmlspecialchars($bandScore, ENT_QUOTES, 'UTF-8'); ?></div>
+                                <div class="row g-3 justify-content-center mb-4 text-start">
+                                    <div class="col-md-4">
+                                        <div class="bg-light border rounded-3 p-3 h-100">
+                                            <div class="text-muted small text-uppercase">Lượt làm bài</div>
+                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $practiceSummary['attempts'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="bg-light border rounded-3 p-3 h-100">
+                                            <div class="text-muted small text-uppercase">Điểm hiện tại</div>
+                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $score, ENT_QUOTES, 'UTF-8'); ?>/5</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="bg-light border rounded-3 p-3 h-100">
+                                            <div class="text-muted small text-uppercase">Điểm tốt nhất</div>
+                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $practiceSummary['bestScore'], ENT_QUOTES, 'UTF-8'); ?>/5</div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <p class="card-text fs-5 mb-4"><?php echo htmlspecialchars($feedback, ENT_QUOTES, 'UTF-8'); ?></p>
                                 <a href="listening.php" class="btn btn-primary me-2">Retake Test</a>
                                 <a href="index.php" class="btn btn-outline-primary">Back to Home</a>

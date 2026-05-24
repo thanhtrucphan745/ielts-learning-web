@@ -68,72 +68,7 @@ if ($currentUser && isset($currentUser['id'])) {
 
 
     <!-- Navbar Start -->
-    <nav class="navbar navbar-expand-lg bg-white navbar-light shadow sticky-top p-0">
-        <a href="index.php" class="navbar-brand d-flex align-items-center px-4 px-lg-5">
-            <h2 class="m-0 text-primary"><i class="fa fa-book me-3"></i>eLEARNING</h2>
-        </a>
-        <button type="button" class="navbar-toggler me-4" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarCollapse">
-            <div class="navbar-nav ms-auto p-4 p-lg-0">
-                <a href="index.php" class="nav-item nav-link active">Trang chủ</a>
-                <a href="about.php" class="nav-item nav-link">Giới thiệu</a>
-                <div class="nav-item dropdown">
-                    <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Khóa học</a>
-                    <div class="dropdown-menu fade-down m-0">
-                        <a href="courses.php?band=0-3.5" class="dropdown-item">Band 0 - 3.5</a>
-                        <a href="courses.php?band=3.5-4.5" class="dropdown-item">Band 3.5 - 4.5</a>
-                        <a href="courses.php?band=4.5-5.5" class="dropdown-item">Band 4.5 - 5.5</a>
-                        <a href="courses.php?band=5.5-6.0" class="dropdown-item">Band 5.5 - 6.0</a>
-                    </div>
-                </div>
-                <div class="nav-item dropdown">
-                    <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Trang</a>
-                    <div class="dropdown-menu fade-down m-0">
-                        <a href="team.php" class="dropdown-item">Đội ngũ</a>
-                        <a href="testimonial.php" class="dropdown-item">Nhận xét</a>
-                        <a href="flashcard.php" class="dropdown-item">Flashcard</a>
-                        <a href="study_plan.php" class="dropdown-item">Lộ trình học</a>
-                        <a href="chat.php" class="dropdown-item">AI Chat</a>
-                        <a href="pages/ielts_tips.php" class="dropdown-item">IELTS Tips</a>
-                        
-                    </div>
-                </div>
-                <a href="contact.php" class="nav-item nav-link">Liên hệ</a>
-            </div>
-            <div class="d-none d-lg-flex align-items-center gap-2 px-4 px-lg-5">
-                <?php if ($currentUser): ?>
-                    <div class="dropdown profile-dropdown">
-                        <a class="d-flex align-items-center text-decoration-none dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <?php if ($avatarUrl !== ''): ?>
-                                <img src="<?php echo htmlspecialchars($avatarUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="Avatar" class="rounded-circle me-2" style="width:44px;height:44px;object-fit:cover;">
-                            <?php else: ?>
-                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" style="width:44px;height:44px;font-weight:700;">
-                                    <?php echo htmlspecialchars($avatarText, ENT_QUOTES, 'UTF-8'); ?>
-                                </div>
-                            <?php endif; ?>
-                            <span class="fw-bold text-dark">Hi, <?php echo htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8'); ?></span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                            <li><a class="dropdown-item" href="profile.php"><i class="fas fa-user-circle me-2 text-primary"></i>Hồ sơ cá nhân</a></li>
-                            <li><a class="dropdown-item" href="practice.php"><i class="fas fa-list-alt me-2 text-primary"></i>Quản lý tin đăng</a></li>
-                            <li><span class="dropdown-item-text"><i class="fas fa-fire me-2 text-warning"></i>Chuỗi học: <?php echo (int) $streakStatus['currentStreak']; ?> ngày</span></li>
-                            <?php if ($role === 1): ?>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item fw-semibold text-primary" href="admin/index.php"><i class="fas fa-shield-alt me-2"></i>Quản trị hệ thống</a></li>
-                            <?php endif; ?>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-power-off me-2"></i>Đăng xuất</a></li>
-                        </ul>
-                    </div>
-                <?php else: ?>
-                    <a href="login.php" class="btn btn-outline-primary py-2 px-4">Đăng nhập</a>
-                    <a href="register.php" class="btn btn-primary py-2 px-4">Đăng ký ngay<i class="fa fa-arrow-right ms-3"></i></a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </nav>
+    <?php include __DIR__ . '/nav.php'; ?>
     <!-- Navbar End -->
 
     <?php if ($currentUser && !empty($streakStatus['needsReminder'])): ?>

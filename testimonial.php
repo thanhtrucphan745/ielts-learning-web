@@ -42,34 +42,7 @@
 
 
     <!-- Navbar Start -->
-    <nav class="navbar navbar-expand-lg bg-white navbar-light shadow sticky-top p-0">
-        <a href="index.php" class="navbar-brand d-flex align-items-center px-4 px-lg-5">
-            <h2 class="m-0 text-primary"><i class="fa fa-book me-3"></i>eLEARNING</h2>
-        </a>
-        <button type="button" class="navbar-toggler me-4" data-bs-toggle="collapse" data-bs-target="#navbarCollapse">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarCollapse">
-            <div class="navbar-nav ms-auto p-4 p-lg-0">
-                <a href="index.php" class="nav-item nav-link">Trang chủ</a>
-                <a href="about.php" class="nav-item nav-link">Giới thiệu</a>
-                <a href="courses.php" class="nav-item nav-link">Khóa học</a>
-                <div class="nav-item dropdown">
-                    <a href="#" class="nav-link dropdown-toggle active" data-bs-toggle="dropdown">Trang</a>
-                    <div class="dropdown-menu fade-down m-0">
-                        <a href="team.php" class="dropdown-item">Đội ngũ</a>
-                        <a href="testimonial.php" class="dropdown-item active">Nhận xét</a>
-                        <a href="study_plan.php" class="dropdown-item">Lộ trình học</a>
-                        <a href="chat.php" class="dropdown-item">AI Chat</a>
-                        <a href="pages/ielts_tips.php" class="dropdown-item">IELTS Tips</a>
-                        
-                    </div>
-                </div>
-                <a href="contact.php" class="nav-item nav-link">Liên hệ</a>
-            </div>
-            <a href="register.php" class="btn btn-primary py-4 px-lg-5 d-none d-lg-block">Đăng ký<i class="fa fa-arrow-right ms-3"></i></a>
-        </div>
-    </nav>
+    <?php include __DIR__ . '/nav.php'; ?>
     <!-- Navbar End -->
 
 
