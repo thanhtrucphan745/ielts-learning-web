@@ -26,6 +26,9 @@ if ($path && $uploadsRoot !== false && strpos($path, $uploadsRoot) === 0 && is_f
     @unlink($path . '.json');
 
     if (isset($conn) && $conn instanceof mysqli) {
+        if (function_exists('ensure_skill_uploads_table')) {
+            ensure_skill_uploads_table($conn);
+        }
         $stmt = $conn->prepare('DELETE FROM skill_uploads WHERE skill = ? AND filename = ?');
         if ($stmt) {
             $stmt->bind_param('ss', $skill, $file);

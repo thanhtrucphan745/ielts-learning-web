@@ -1,0 +1,57 @@
+{
+  "title": "Reading B1 - The London Eye",
+  "description": "Diagnostic reading test for B1 level",
+  "passage": "The London Eye, also known as the Millennium Wheel, is a giant observation wheel located on the South Bank of the River Thames in London. It was opened to the public on March 9, 2000, and has become one of the most popular tourist attractions in the city. The wheel is 135 metres tall and has 32 passenger capsules. Each capsule can hold up to 25 people. A complete rotation takes approximately 30 minutes, giving visitors enough time to enjoy views of famous landmarks such as Big Ben, St Paul's Cathedral, and Buckingham Palace.",
+  "questions": [
+    {
+      "question": "Where is the London Eye located?",
+      "options": [
+        "On the South Bank of the River Thames",
+        "Near the Eiffel Tower",
+        "In the north of England",
+        "Next to Oxford University"
+      ],
+      "answer": 0
+    },
+    {
+      "question": "When was the London Eye opened to the public?",
+      "options": [
+        "March 9, 1999",
+        "March 9, 2000",
+        "March 9, 2001",
+        "March 19, 2000"
+      ],
+      "answer": 1
+    },
+    {
+      "question": "How tall is the London Eye?",
+      "options": [
+        "125 metres",
+        "130 metres",
+        "135 metres",
+        "150 metres"
+      ],
+      "answer": 2
+    },
+    {
+      "question": "How many passenger capsules does it have?",
+      "options": [
+        "25",
+        "30",
+        "32",
+        "35"
+      ],
+      "answer": 2
+    },
+    {
+      "question": "How long does a complete rotation take?",
+      "options": [
+        "About 15 minutes",
+        "About 20 minutes",
+        "About 30 minutes",
+        "About 60 minutes"
+      ],
+      "answer": 2
+    }
+  ]
+}

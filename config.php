@@ -65,4 +65,39 @@ if (!defined('OPENAI_API_KEY')) {
 if (!defined('OPENAI_MODEL')) {
     define('OPENAI_MODEL', getenv('OPENAI_MODEL') ?: 'gpt-4o-mini');
 }
+
+if (!function_exists('ensure_skill_uploads_table')) {
+    function ensure_skill_uploads_table(mysqli $conn): bool
+    {
+        static $checked = false;
+        static $exists = false;
+
+        if ($checked) {
+            return $exists;
+        }
+
+        $checked = true;
+        $sql = "CREATE TABLE IF NOT EXISTS `skill_uploads` (
+          `id` int NOT NULL AUTO_INCREMENT,
+          `skill` varchar(50) NOT NULL,
+          `title` varchar(255) DEFAULT NULL,
+          `description` text,
+          `filename` varchar(255) NOT NULL,
+          `original_name` varchar(255) DEFAULT NULL,
+          `mime` varchar(100) DEFAULT NULL,
+          `size` int DEFAULT NULL,
+          `uploaded_by` int DEFAULT NULL,
+          `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+
+        try {
+            $exists = $conn->query($sql) === true;
+        } catch (Throwable $e) {
+            $exists = false;
+        }
+
+        return $exists;
+    }
+}
 ?>

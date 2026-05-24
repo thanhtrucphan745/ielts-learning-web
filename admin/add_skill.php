@@ -149,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $uploadedBy = (int) (auth_user()['id'] ?? 0);
 
                 if (isset($conn) && $conn instanceof mysqli) {
+                    ensure_skill_uploads_table($conn);
                     $stmt = $conn->prepare('INSERT INTO skill_uploads (skill, title, description, filename, original_name, mime, size, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())');
                     if ($stmt) {
                         $skillParam = $skill;
@@ -173,7 +174,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $files = [];
 $dbMetaByFile = [];
 if ($isReadingSkill && isset($conn) && $conn instanceof mysqli) {
-    $stmt = $conn->prepare('SELECT filename, title, description, original_name, mime, size, uploaded_by, created_at FROM skill_uploads WHERE skill = ? ORDER BY id DESC');
+    if (ensure_skill_uploads_table($conn)) {
+        $stmt = $conn->prepare('SELECT filename, title, description, original_name, mime, size, uploaded_by, created_at FROM skill_uploads WHERE skill = ? ORDER BY id DESC');
+    } else {
+        $stmt = false;
+    }
     if ($stmt) {
         $readingSkill = 'reading';
         $stmt->bind_param('s', $readingSkill);
