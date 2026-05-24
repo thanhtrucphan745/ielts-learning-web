@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th5 24, 2026 lúc 04:26 PM
+-- Thời gian đã tạo: Th5 24, 2026 lúc 05:25 PM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.0.30
 
@@ -324,6 +324,33 @@ INSERT INTO `skills` (`id`, `name`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Cấu trúc bảng cho bảng `skill_uploads`
+--
+
+CREATE TABLE `skill_uploads` (
+  `id` int(11) NOT NULL,
+  `skill` varchar(50) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `filename` varchar(255) NOT NULL,
+  `original_name` varchar(255) DEFAULT NULL,
+  `mime` varchar(100) DEFAULT NULL,
+  `size` int(11) DEFAULT NULL,
+  `uploaded_by` int(11) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `skill_uploads`
+--
+
+INSERT INTO `skill_uploads` (`id`, `skill`, `title`, `description`, `filename`, `original_name`, `mime`, `size`, `uploaded_by`, `created_at`) VALUES
+(1, 'reading', 'Reading B1 - A Healthy Lifestyle', 'Practice reading test about health and daily habits', '20260524_171608_39e1aeb5cb65_reading_b1_healthy_lifestyle.json', 'reading_b1_healthy_lifestyle.json', 'application/json', 2014, 1, '2026-05-24 22:16:08'),
+(2, 'reading', 'Reading B1 - The London Eye', 'Diagnostic reading test for B1 level', '20260524_171706_42783fb1ff78_reading_b1_london_eye.json', 'reading_b1_london_eye.json', 'application/json', 1764, 1, '2026-05-24 22:17:06');
+
+-- --------------------------------------------------------
+
+--
 -- Cấu trúc bảng cho bảng `study_sessions`
 --
 
@@ -386,7 +413,7 @@ CREATE TABLE `users` (
   `password` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `username` varchar(50) DEFAULT NULL,
-  `role` int(11) DEFAULT 0 COMMENT '1:admin, 2:người học ',
+  `role` int(11) DEFAULT 0 COMMENT '1:admin, 2:người học ,0: giảng viên',
   `phone` varchar(15) DEFAULT NULL,
   `avatar` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -401,7 +428,7 @@ INSERT INTO `users` (`id`, `name`, `email`, `password`, `created_at`, `username`
 (8, 'Phương', 'phuong@gmail.com', '123456', '2026-04-17 14:49:29', NULL, 2, '0912345678', 'default.jpg'),
 (9, 'Quân', 'quan@gmail.com', '123456', '2026-04-17 14:49:29', NULL, 2, '0912345678', 'default.jpg'),
 (10, 'Trang', 'trang@gmail.com', '123456', '2026-04-17 14:49:29', NULL, 2, '0912345678', 'default.jpg'),
-(13, 'Thanh Trúc', 'truc@gmail.com', '745', '2026-05-07 17:56:37', NULL, 0, NULL, NULL),
+(13, 'Thanh Trúc', 'truc@gmail.com', '745', '2026-05-07 17:56:37', 'giangvien', 0, NULL, NULL),
 (14, 'Trần Nga', 'ngatran@gmail.com', '123', '2026-05-07 17:58:35', NULL, 0, NULL, NULL),
 (15, 'Trúc Phan', 'trup@gmai.com', '$2y$10$vQsEdLgsrHYK73mki1gFwuYBVx5fD7if.CmeirziXQ6sC8wjQyHtS', '2026-05-12 08:22:01', 'trucphan', 2, '098765432', '');
 
@@ -514,6 +541,12 @@ ALTER TABLE `skills`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Chỉ mục cho bảng `skill_uploads`
+--
+ALTER TABLE `skill_uploads`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Chỉ mục cho bảng `study_sessions`
 --
 ALTER TABLE `study_sessions`
@@ -614,6 +647,12 @@ ALTER TABLE `site_posts`
 --
 ALTER TABLE `skills`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT cho bảng `skill_uploads`
+--
+ALTER TABLE `skill_uploads`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT cho bảng `study_sessions`
