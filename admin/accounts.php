@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'], $_POST['ro
             $stmt->bind_param('ii', $role, $userId);
             $stmt->execute();
             $stmt->close();
-            $message = 'Account role updated.';
+            $message = 'Đã cập nhật vai trò tài khoản.';
         }
     }
 }
@@ -26,22 +26,22 @@ if ($result) {
     }
 }
 
-admin_render_header('Accounts Management', 'accounts', 'Edit roles and review account data');
+admin_render_header('Tài khoản', 'accounts', 'Cập nhật vai trò và thông tin tài khoản');
 if ($message):
 ?>
 <div class="alert alert-success"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
 <?php endif; ?>
 <div class="card content-card shadow mb-4">
     <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Account roles</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Vai trò tài khoản</h6>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered align-middle" width="100%" cellspacing="0">
-                <thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Email</th><th>Phone</th><th>Role</th><th>Action</th></tr></thead>
+                <thead><tr><th>ID</th><th>Họ tên</th><th>Tên đăng nhập</th><th>Email</th><th>Số điện thoại</th><th>Vai trò</th><th>Thao tác</th></tr></thead>
                 <tbody>
                     <?php if (!$accounts): ?>
-                        <tr><td colspan="7" class="text-center text-muted">No accounts found.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted">Không có tài khoản nào.</td></tr>
                     <?php else: ?>
                         <?php foreach ($accounts as $account): ?>
                             <tr>
@@ -55,14 +55,14 @@ if ($message):
                                     <form method="post" class="form-inline">
                                         <input type="hidden" name="user_id" value="<?php echo (int) $account['id']; ?>">
                                         <select name="role" class="form-control form-control-sm mr-2">
-                                            <option value="1"<?php echo ((int) $account['role'] === 1) ? ' selected' : ''; ?>>Admin</option>
-                                            <option value="2"<?php echo ((int) $account['role'] === 2) ? ' selected' : ''; ?>>Student</option>
+                                            <option value="1"<?php echo ((int) $account['role'] === 1) ? ' selected' : ''; ?>>Quản trị viên</option>
+                                            <option value="2"<?php echo ((int) $account['role'] === 2) ? ' selected' : ''; ?>>Học viên</option>
                                         </select>
-                                        <button class="btn btn-sm btn-primary">Save</button>
+                                        <button class="btn btn-sm btn-primary">Lưu</button>
                                     </form>
                                     <div class="mt-2">
-                                        <a href="user_edit.php?id=<?php echo (int) $account['id']; ?>" class="btn btn-sm btn-info">Edit</a>
-                                        <a href="user_delete.php?id=<?php echo (int) $account['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this account?');">Delete</a>
+                                        <a href="user_edit.php?id=<?php echo (int) $account['id']; ?>" class="btn btn-sm btn-info">Sửa</a>
+                                        <a href="user_delete.php?id=<?php echo (int) $account['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Xóa tài khoản này?');">Xóa</a>
                                     </div>
                                 </td>
                             </tr>

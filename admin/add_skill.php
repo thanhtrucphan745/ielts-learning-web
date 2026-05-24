@@ -11,13 +11,15 @@ if (!in_array($skill, $allowed, true)) {
     $skill = 'reading';
 }
 
+$message = '';
 $uploadsDir = __DIR__ . '/../uploads/' . $skill;
 if (!is_dir($uploadsDir)) {
-    @mkdir($uploadsDir, 0755, true);
+    if (!@mkdir($uploadsDir, 0755, true) && !is_dir($uploadsDir)) {
+        $message = 'Không tạo được thư mục uploads/' . $skill . '. Kiểm tra quyền ghi.';
+    }
 }
 
 // file restrictions and DB storage
-$message = '';
 $maxSize = 10 * 1024 * 1024; // 10 MB
 $allowedExts = ['pdf','doc','docx','txt','mp3','m4a','wav','jpg','jpeg','png'];
 
@@ -25,9 +27,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim((string) ($_POST['title'] ?? ''));
     $description = trim((string) ($_POST['description'] ?? ''));
 
-    if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-        $message = 'Vui lòng chọn file hợp lệ để tải lên.';
-    } else {
+    if ($message === '') {
+        if (empty($_FILES['file'])) {
+            $message = 'Vui lòng chọn file hợp lệ để tải lên.';
+        } elseif ($_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+            switch ((int) $_FILES['file']['error']) {
+                case UPLOAD_ERR_INI_SIZE:
+                case UPLOAD_ERR_FORM_SIZE:
+                    $message = 'File vượt quá giới hạn cho phép.';
+                    break;
+                case UPLOAD_ERR_PARTIAL:
+                    $message = 'File chỉ tải lên được một phần.';
+                    break;
+                case UPLOAD_ERR_NO_FILE:
+                    $message = 'Bạn chưa chọn file.';
+                    break;
+                case UPLOAD_ERR_NO_TMP_DIR:
+                    $message = 'Thiếu thư mục tạm để upload.';
+                    break;
+                case UPLOAD_ERR_CANT_WRITE:
+                    $message = 'Không thể ghi file lên máy chủ.';
+                    break;
+                case UPLOAD_ERR_EXTENSION:
+                    $message = 'Bị chặn bởi một extension của PHP.';
+                    break;
+                default:
+                    $message = 'Upload thất bại (mã lỗi ' . (int) $_FILES['file']['error'] . ').';
+                    break;
+            }
+        }
+    }
+
+    if ($message === '') {
         $f = $_FILES['file'];
         $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
 
@@ -45,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($finfo) finfo_close($finfo);
 
             if (move_uploaded_file($f['tmp_name'], $target)) {
+                $uploadedBy = (int) (auth_user()['id'] ?? 0);
                 // store metadata JSON sidecar
                 $meta = [
                     'original_name' => $f['name'],
@@ -52,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'title' => $title,
                     'description' => $description,
                     'uploaded_at' => date('c'),
-                    'uploaded_by' => auth_user()['id'] ?? null,
+                    'uploaded_by' => $uploadedBy ?: null,
                     'mime' => $mime,
                     'size' => $f['size'],
                 ];
@@ -67,7 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $origParam = $f['name'];
                         $mimeParam = $mime;
                         $sizeParam = (int) $f['size'];
-                        $uploadedBy = auth_user()['id'] ?? null;
                         $stmt->bind_param('ssssssii', $skillParam, $title, $description, $filenameParam, $origParam, $mimeParam, $sizeParam, $uploadedBy);
                         $stmt->execute();
                         $stmt->close();
@@ -115,7 +146,7 @@ if ($dh) {
 </head>
 <body>
     <div class="container">
-        <h3>Upload file cho: <?php echo htmlspecialchars(strtoupper($skill), ENT_QUOTES, 'UTF-8'); ?></h3>
+        <h3>Gửi file lên website cho: <?php echo htmlspecialchars(strtoupper($skill), ENT_QUOTES, 'UTF-8'); ?></h3>
         <p><a href="index.php">&larr; Về Dashboard</a></p>
 
         <?php if ($message): ?>
@@ -132,10 +163,10 @@ if ($dh) {
                 <textarea name="description" class="form-control" rows="3"></textarea>
             </div>
             <div class="mb-3">
-                <label class="form-label">Chọn file</label>
-                <input type="file" name="file" class="form-control" />
+                <label class="form-label">Chọn file từ máy</label>
+                <input type="file" name="file" class="form-control" required accept=".pdf,.doc,.docx,.txt,.mp3,.m4a,.wav,.jpg,.jpeg,.png" />
             </div>
-            <button class="btn btn-primary">Tải lên</button>
+            <button class="btn btn-primary" type="submit">Gửi lên website</button>
         </form>
 
         <h5>File đã tải lên</h5>

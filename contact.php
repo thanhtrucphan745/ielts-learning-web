@@ -19,6 +19,11 @@ $emailValue = '';
 $subjectValue = '';
 $messageValue = '';
 
+if ($currentUser) {
+    $nameValue = (string) ($currentUser['name'] ?? $currentUser['username'] ?? '');
+    $emailValue = (string) ($currentUser['email'] ?? '');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nameValue = trim($_POST['name'] ?? '');
     $emailValue = trim($_POST['email'] ?? '');
@@ -106,6 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <h6 class="section-title bg-white text-center text-primary px-3">Contact Us</h6>
                 <h1 class="mb-5">Liên hệ với chúng tôi</h1>
             </div>
+                <?php if ($currentUser): ?>
+                    <div class="alert alert-info mb-4">
+                        Bạn sẽ nhận phản hồi của quản trị viên trong biểu tượng chuông ở thanh điều hướng nếu dùng đúng email tài khoản hiện tại.
+                    </div>
+                <?php endif; ?>
             <div class="row g-4">
                 <div class="col-lg-4 wow fadeInUp" data-wow-delay="0.1s">
                     <div class="bg-light rounded p-4 h-100">

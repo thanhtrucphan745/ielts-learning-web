@@ -14,9 +14,13 @@
         'currentStreak' => 0,
         'bestStreak' => 0,
     ];
+    $replyCount = 0;
+    $replyItems = [];
 
     if ($currentUser && isset($currentUser['id'])) {
         $streakStatus = streak_get_status($conn, (int) $currentUser['id']);
+        $replyCount = auth_contact_reply_count($conn, (string) ($currentUser['email'] ?? ''));
+        $replyItems = auth_contact_reply_items($conn, (string) ($currentUser['email'] ?? ''), 5);
     }
 
     // compute a project-root base href so pages inside subfolders (e.g. /pages/) load assets correctly
@@ -60,6 +64,35 @@
 
     <div class="d-none d-lg-flex align-items-center px-4 px-lg-5 flex-shrink-0">
         <?php if ($currentUser): ?>
+            <div class="dropdown me-2">
+                <a class="btn btn-sm btn-light position-relative rounded-circle d-flex align-items-center justify-content-center" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="width:38px;height:38px;">
+                    <i class="fa fa-bell text-primary"></i>
+                    <?php if ($replyCount > 0): ?>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"><?php echo (int) $replyCount; ?></span>
+                    <?php endif; ?>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 300px;">
+                    <li class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Tin nhắn quản trị</span>
+                        <a href="notifications.php" class="small text-primary text-decoration-none">Xem tất cả</a>
+                    </li>
+                    <?php if (!$replyItems): ?>
+                        <li><span class="dropdown-item-text text-muted small">Chưa có phản hồi mới.</span></li>
+                    <?php else: ?>
+                        <?php foreach ($replyItems as $replyItem): ?>
+                            <li>
+                                <a class="dropdown-item py-2" href="notifications.php#reply-<?php echo (int) $replyItem['id']; ?>">
+                                    <div class="small text-muted mb-1"><?php echo htmlspecialchars($replyItem['subject'] ?? '', ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <div class="text-dark small" style="white-space: normal;">
+                                        <?php echo htmlspecialchars(mb_strimwidth((string) ($replyItem['reply_message'] ?? ''), 0, 80, '...'), ENT_QUOTES, 'UTF-8'); ?>
+                                    </div>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </ul>
+            </div>
+
             <span class="btn btn-sm btn-outline-primary rounded-pill text-nowrap" aria-label="Chuỗi học hiện tại">
                 <i class="fa fa-fire me-1"></i> Chuỗi học: <?php echo (int) $streakStatus['currentStreak']; ?> ngày
             </span>

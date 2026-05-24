@@ -32,11 +32,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $newPassword = (string) ($_POST['password'] ?? '');
 
     if ($name === '' || $username === '' || $email === '') {
-        $message = 'Name, username, and email are required.';
+        $message = 'Vui lòng nhập họ tên, tên đăng nhập và email.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message = 'Email is invalid.';
+        $message = 'Email không hợp lệ.';
     } elseif (!in_array($role, [1, 2], true)) {
-        $message = 'Role is invalid.';
+        $message = 'Vai trò không hợp lệ.';
     } else {
         $check = $conn->prepare('SELECT id FROM users WHERE (username = ? OR email = ?) AND id <> ? LIMIT 1');
         if ($check) {
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $check->close();
 
             if ($duplicate) {
-                $message = 'Username or email already exists.';
+                $message = 'Tên đăng nhập hoặc email đã tồn tại.';
             } else {
                 if ($newPassword !== '') {
                     $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $update->bind_param('ssssisi', $name, $username, $email, $phone, $role, $hashedPassword, $userId);
                         $update->execute();
                         $update->close();
-                        $message = 'User updated.';
+                        $message = 'Đã cập nhật người dùng.';
                     }
                 } else {
                     $update = $conn->prepare('UPDATE users SET name = ?, username = ?, email = ?, phone = ?, role = ? WHERE id = ?');
@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $update->bind_param('ssssii', $name, $username, $email, $phone, $role, $userId);
                         $update->execute();
                         $update->close();
-                        $message = 'User updated.';
+                        $message = 'Đã cập nhật người dùng.';
                     }
                 }
 
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-admin_render_header('Edit User', 'users', 'Update user account information');
+admin_render_header('Sửa người dùng', 'users', 'Cập nhật thông tin tài khoản');
 if ($message):
 ?>
 <div class="alert alert-info"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
@@ -89,18 +89,18 @@ if ($message):
     <div class="col-lg-8">
         <div class="card content-card shadow mb-4">
             <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Edit user #<?php echo (int) $user['id']; ?></h6>
+                <h6 class="m-0 font-weight-bold text-primary">Sửa người dùng #<?php echo (int) $user['id']; ?></h6>
             </div>
             <div class="card-body">
                 <form method="post">
                     <input type="hidden" name="id" value="<?php echo (int) $user['id']; ?>">
                     <div class="row">
                         <div class="col-md-6 form-group">
-                            <label>Name</label>
+                            <label>Họ tên</label>
                             <input class="form-control" name="name" value="<?php echo htmlspecialchars($user['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" required>
                         </div>
                         <div class="col-md-6 form-group">
-                            <label>Username</label>
+                            <label>Tên đăng nhập</label>
                             <input class="form-control" name="username" value="<?php echo htmlspecialchars($user['username'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" required>
                         </div>
                         <div class="col-md-6 form-group">
@@ -108,23 +108,23 @@ if ($message):
                             <input type="email" class="form-control" name="email" value="<?php echo htmlspecialchars($user['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" required>
                         </div>
                         <div class="col-md-6 form-group">
-                            <label>Phone</label>
+                            <label>Số điện thoại</label>
                             <input class="form-control" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
                         <div class="col-md-6 form-group">
-                            <label>Role</label>
+                            <label>Vai trò</label>
                             <select class="form-control" name="role">
-                                <option value="1"<?php echo ((int) $user['role'] === 1) ? ' selected' : ''; ?>>Admin</option>
-                                <option value="2"<?php echo ((int) $user['role'] === 2) ? ' selected' : ''; ?>>Student</option>
+                                <option value="1"<?php echo ((int) $user['role'] === 1) ? ' selected' : ''; ?>>Quản trị viên</option>
+                                <option value="2"<?php echo ((int) $user['role'] === 2) ? ' selected' : ''; ?>>Học viên</option>
                             </select>
                         </div>
                         <div class="col-md-6 form-group">
-                            <label>New password</label>
-                            <input type="password" class="form-control" name="password" placeholder="Leave blank to keep current password">
+                            <label>Mật khẩu mới</label>
+                            <input type="password" class="form-control" name="password" placeholder="Để trống nếu không đổi mật khẩu">
                         </div>
                     </div>
-                    <button class="btn btn-primary">Save changes</button>
-                    <a href="users.php" class="btn btn-secondary">Back</a>
+                    <button class="btn btn-primary">Lưu thay đổi</button>
+                    <a href="users.php" class="btn btn-secondary">Quay lại</a>
                 </form>
             </div>
         </div>

@@ -38,6 +38,19 @@ function admin_ensure_feedback_status_column(mysqli $conn): void
     }
 }
 
+function admin_ensure_feedback_reply_columns(mysqli $conn): void
+{
+    $result = $conn->query("SHOW COLUMNS FROM contact_messages LIKE 'reply_message'");
+    if ($result && $result->num_rows === 0) {
+        $conn->query("ALTER TABLE contact_messages ADD COLUMN reply_message LONGTEXT NULL AFTER is_read");
+    }
+
+    $result = $conn->query("SHOW COLUMNS FROM contact_messages LIKE 'replied_at'");
+    if ($result && $result->num_rows === 0) {
+        $conn->query("ALTER TABLE contact_messages ADD COLUMN replied_at DATETIME NULL AFTER reply_message");
+    }
+}
+
 function admin_render_header(string $title, string $activeSection, string $subtitle = ''): void
 {
     auth_require_role(1);
@@ -53,22 +66,22 @@ function admin_render_header(string $title, string $activeSection, string $subti
     echo '<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><title>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</title><link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css"><link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,800,900" rel="stylesheet"><link href="css/sb-admin-2.min.css" rel="stylesheet"><style>.sidebar .nav-item .nav-link.active{font-weight:700}.content-card{border:0;box-shadow:0 .15rem 1.75rem 0 rgba(58,59,69,.15)}</style></head><body id="page-top"><div id="wrapper">';
 
     echo '<ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">';
-    echo '<a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.php"><div class="sidebar-brand-icon rotate-n-15"><i class="fas fa-laugh-wink"></i></div><div class="sidebar-brand-text mx-3">SB Admin <sup>2</sup></div></a>';
+    echo '<a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.php"><div class="sidebar-brand-icon rotate-n-15"><i class="fas fa-laugh-wink"></i></div><div class="sidebar-brand-text mx-3">Admin <sup>2</sup></div></a>';
     echo '<hr class="sidebar-divider my-0">';
-    echo '<li class="nav-item ' . $active('dashboard') . '"><a class="nav-link" href="index.php"><i class="fas fa-fw fa-tachometer-alt"></i><span>Dashboard</span></a></li>';
+    echo '<li class="nav-item ' . $active('dashboard') . '"><a class="nav-link" href="index.php"><i class="fas fa-fw fa-tachometer-alt"></i><span>Trang chính</span></a></li>';
     echo '<hr class="sidebar-divider">';
-    echo '<div class="sidebar-heading">Management</div>';
-    echo '<li class="nav-item ' . $active('users') . '"><a class="nav-link" href="users.php"><i class="fas fa-fw fa-users"></i><span>Users</span></a></li>';
-    echo '<li class="nav-item ' . $active('accounts') . '"><a class="nav-link" href="accounts.php"><i class="fas fa-fw fa-id-card"></i><span>Accounts</span></a></li>';
-    echo '<li class="nav-item ' . $active('statistics') . '"><a class="nav-link" href="statistics.php"><i class="fas fa-fw fa-chart-line"></i><span>Statistics</span></a></li>';
-    echo '<li class="nav-item ' . $active('posts') . '"><a class="nav-link" href="posts.php"><i class="fas fa-fw fa-pen-nib"></i><span>Posts</span></a></li>';
-    echo '<li class="nav-item ' . $active('feedback') . '"><a class="nav-link" href="feedback.php"><i class="fas fa-fw fa-inbox"></i><span>Feedback</span></a></li>';
+    echo '<div class="sidebar-heading">Quản lý</div>';
+    echo '<li class="nav-item ' . $active('users') . '"><a class="nav-link" href="users.php"><i class="fas fa-fw fa-users"></i><span>Người dùng</span></a></li>';
+    echo '<li class="nav-item ' . $active('accounts') . '"><a class="nav-link" href="accounts.php"><i class="fas fa-fw fa-id-card"></i><span>Tài khoản</span></a></li>';
+    echo '<li class="nav-item ' . $active('statistics') . '"><a class="nav-link" href="statistics.php"><i class="fas fa-fw fa-chart-line"></i><span>Thống kê</span></a></li>';
+    echo '<li class="nav-item ' . $active('posts') . '"><a class="nav-link" href="posts.php"><i class="fas fa-fw fa-pen-nib"></i><span>Bài viết</span></a></li>';
+    echo '<li class="nav-item ' . $active('feedback') . '"><a class="nav-link" href="feedback.php"><i class="fas fa-fw fa-inbox"></i><span>Phản hồi</span></a></li>';
     echo '<hr class="sidebar-divider">';
-    echo '<div class="sidebar-heading">Skills</div>';
-    echo '<li class="nav-item"><a class="nav-link" href="add_skill.php?skill=reading"><i class="fas fa-fw fa-book-open"></i><span>Reading</span></a></li>';
-    echo '<li class="nav-item"><a class="nav-link" href="add_skill.php?skill=listening"><i class="fas fa-fw fa-headphones"></i><span>Listening</span></a></li>';
-    echo '<li class="nav-item"><a class="nav-link" href="add_skill.php?skill=writing"><i class="fas fa-fw fa-pencil-alt"></i><span>Writing</span></a></li>';
-    echo '<li class="nav-item"><a class="nav-link" href="add_skill.php?skill=speaking"><i class="fas fa-fw fa-microphone"></i><span>Speaking</span></a></li>';
+    echo '<div class="sidebar-heading">Kỹ năng</div>';
+    echo '<li class="nav-item"><a class="nav-link" href="add_skill.php?skill=reading"><i class="fas fa-fw fa-book-open"></i><span>Đọc</span></a></li>';
+    echo '<li class="nav-item"><a class="nav-link" href="add_skill.php?skill=listening"><i class="fas fa-fw fa-headphones"></i><span>Nghe</span></a></li>';
+    echo '<li class="nav-item"><a class="nav-link" href="add_skill.php?skill=writing"><i class="fas fa-fw fa-pencil-alt"></i><span>Viết</span></a></li>';
+    echo '<li class="nav-item"><a class="nav-link" href="add_skill.php?skill=speaking"><i class="fas fa-fw fa-microphone"></i><span>Nói</span></a></li>';
     echo '<hr class="sidebar-divider d-none d-md-block">';
     echo '<div class="text-center d-none d-md-inline"><button class="rounded-circle border-0" id="sidebarToggle"></button></div>';
     echo '</ul>';
@@ -80,7 +93,7 @@ function admin_render_header(string $title, string $activeSection, string $subti
     if ($userEmail !== '') {
         echo '<p class="mb-0 text-muted small">' . htmlspecialchars($userEmail, ENT_QUOTES, 'UTF-8') . '</p>';
     }
-    echo '</div><a href="index.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="fas fa-home fa-sm text-white-50 mr-1"></i>Dashboard</a></div>';
+    echo '</div><a href="index.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="fas fa-home fa-sm text-white-50 mr-1"></i>Trang chính</a></div>';
 }
 
 function admin_render_footer(): void

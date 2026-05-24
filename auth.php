@@ -13,17 +13,25 @@ function auth_user(): ?array
     return $_SESSION['auth_user'] ?? null;
 }
 
+function auth_ensure_reply_notification_columns(mysqli $conn): void
+{
+    $result = $conn->query("SHOW COLUMNS FROM contact_messages LIKE 'user_seen_at'");
+    if ($result && $result->num_rows === 0) {
+        $conn->query("ALTER TABLE contact_messages ADD COLUMN user_seen_at DATETIME NULL AFTER replied_at");
+    }
+}
+
 function auth_role_label(int $role): string
 {
     if ($role === 1) {
-        return 'Admin';
+        return 'Quản trị viên';
     }
 
     if ($role === 2) {
-        return 'Student';
+        return 'Học viên';
     }
 
-    return 'Unknown';
+    return 'Không xác định';
 }
 
 function auth_login(mysqli $conn, string $identifier, string $password): array
@@ -135,4 +143,61 @@ function auth_redirect_by_role(): void
 
     header('Location: login.php');
     exit;
+}
+
+function auth_contact_reply_count(mysqli $conn, string $email): int
+{
+    auth_ensure_reply_notification_columns($conn);
+
+    $stmt = $conn->prepare('SELECT COUNT(*) AS total FROM contact_messages WHERE email = ? AND reply_message IS NOT NULL AND user_seen_at IS NULL');
+    if (!$stmt) {
+        return 0;
+    }
+
+    $stmt->bind_param('s', $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : [];
+    $stmt->close();
+
+    return (int) ($row['total'] ?? 0);
+}
+
+function auth_contact_reply_items(mysqli $conn, string $email, int $limit = 5): array
+{
+    auth_ensure_reply_notification_columns($conn);
+
+    $limit = max(1, min(20, $limit));
+    $sql = 'SELECT id, subject, reply_message, replied_at, user_seen_at FROM contact_messages WHERE email = ? AND reply_message IS NOT NULL ORDER BY COALESCE(replied_at, created_at) DESC LIMIT ' . $limit;
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+
+    $stmt->bind_param('s', $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $items = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $items[] = $row;
+        }
+    }
+    $stmt->close();
+
+    return $items;
+}
+
+function auth_mark_contact_replies_seen(mysqli $conn, string $email): void
+{
+    auth_ensure_reply_notification_columns($conn);
+
+    $stmt = $conn->prepare('UPDATE contact_messages SET user_seen_at = NOW() WHERE email = ? AND reply_message IS NOT NULL AND user_seen_at IS NULL');
+    if (!$stmt) {
+        return;
+    }
+
+    $stmt->bind_param('s', $email);
+    $stmt->execute();
+    $stmt->close();
 }

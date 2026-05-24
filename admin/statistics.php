@@ -49,29 +49,29 @@ if ($result) {
     }
 }
 
-admin_render_header('Statistics', 'statistics', 'Overview of platform activity');
+admin_render_header('Thống kê', 'statistics', 'Tổng quan hoạt động của hệ thống');
 ?>
 <div class="row">
-    <div class="col-xl-3 col-md-6 mb-4"><div class="card border-left-primary shadow h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Users</div><div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $stats['users']; ?></div></div></div></div>
-    <div class="col-xl-3 col-md-6 mb-4"><div class="card border-left-success shadow h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-success text-uppercase mb-1">Contacts</div><div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $stats['contacts']; ?></div></div></div></div>
-    <div class="col-xl-3 col-md-6 mb-4"><div class="card border-left-info shadow h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-info text-uppercase mb-1">Study sessions</div><div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $stats['sessions']; ?></div></div></div></div>
-    <div class="col-xl-3 col-md-6 mb-4"><div class="card border-left-warning shadow h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Posts</div><div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $stats['posts']; ?></div></div></div></div>
+    <div class="col-xl-3 col-md-6 mb-4"><div class="card border-left-primary shadow h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Người dùng</div><div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $stats['users']; ?></div></div></div></div>
+    <div class="col-xl-3 col-md-6 mb-4"><div class="card border-left-success shadow h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-success text-uppercase mb-1">Liên hệ</div><div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $stats['contacts']; ?></div></div></div></div>
+    <div class="col-xl-3 col-md-6 mb-4"><div class="card border-left-info shadow h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-info text-uppercase mb-1">Lượt học</div><div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $stats['sessions']; ?></div></div></div></div>
+    <div class="col-xl-3 col-md-6 mb-4"><div class="card border-left-warning shadow h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Bài viết</div><div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $stats['posts']; ?></div></div></div></div>
 </div>
 
 <div class="row mb-4">
-    <div class="col-lg-6 mb-4"><div class="card content-card shadow h-100"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">User breakdown</h6></div><div class="card-body"><p class="mb-2">Admins: <strong><?php echo $stats['admins']; ?></strong></p><p class="mb-0">Students: <strong><?php echo $stats['students']; ?></strong></p></div></div></div>
-    <div class="col-lg-6 mb-4"><div class="card content-card shadow h-100"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Feedback status</h6></div><div class="card-body"><p class="mb-2">Unread feedback: <strong><?php echo $stats['unread_contacts']; ?></strong></p><p class="mb-0 text-muted">Mark messages as read from the Feedback page.</p></div></div></div>
+    <div class="col-lg-6 mb-4"><div class="card content-card shadow h-100"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Phân bổ người dùng</h6></div><div class="card-body"><p class="mb-2">Quản trị viên: <strong><?php echo $stats['admins']; ?></strong></p><p class="mb-0">Học viên: <strong><?php echo $stats['students']; ?></strong></p></div></div></div>
+    <div class="col-lg-6 mb-4"><div class="card content-card shadow h-100"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Trạng thái phản hồi</h6></div><div class="card-body"><p class="mb-2">Phản hồi chưa đọc: <strong><?php echo $stats['unread_contacts']; ?></strong></p><p class="mb-0 text-muted">Có thể đánh dấu đã đọc tại mục Phản hồi.</p></div></div></div>
 </div>
 
 <div class="card content-card shadow mb-4">
-    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Recent study sessions</h6></div>
+    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Lượt học gần đây</h6></div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-bordered" width="100%" cellspacing="0">
-                <thead><tr><th>Skill</th><th>Activity</th><th>Score</th><th>Band</th><th>Duration</th><th>Date</th></tr></thead>
+                <thead><tr><th>Kỹ năng</th><th>Hoạt động</th><th>Điểm</th><th>Band</th><th>Thời lượng</th><th>Ngày</th></tr></thead>
                 <tbody>
                     <?php if (!$recentSessions): ?>
-                        <tr><td colspan="6" class="text-center text-muted">No sessions yet.</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted">Chưa có lượt học nào.</td></tr>
                     <?php else: ?>
                         <?php foreach ($recentSessions as $session): ?>
                             <tr>
