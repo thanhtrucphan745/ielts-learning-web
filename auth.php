@@ -31,6 +31,10 @@ function auth_role_label(int $role): string
         return 'Học viên';
     }
 
+    if ($role === 3) {
+        return 'Giảng viên';
+    }
+
     return 'Không xác định';
 }
 
@@ -79,7 +83,7 @@ function auth_login(mysqli $conn, string $identifier, string $password): array
     }
 
     $role = isset($user['role']) ? (int) $user['role'] : 0;
-    if (!in_array($role, [1, 2], true)) {
+    if (!in_array($role, [1, 2, 3], true)) {
         return [
             'ok' => false,
             'message' => 'Your account has no valid role. Please contact admin.'
@@ -111,15 +115,39 @@ function auth_require_login(): void
     }
 }
 
-function auth_require_role(int $requiredRole): void
+function require_role($requiredRoles): void
 {
     auth_require_login();
 
     $user = auth_user();
-    if (!$user || (int) $user['role'] !== $requiredRole) {
+    $role = (int) ($user['role'] ?? 0);
+    $allowedRoles = is_array($requiredRoles) ? $requiredRoles : [$requiredRoles];
+    $allowedRoles = array_map('intval', $allowedRoles);
+
+    if (!$user || !in_array($role, $allowedRoles, true)) {
         header('Location: login.php?error=access_denied');
         exit;
     }
+}
+
+function auth_require_role(int $requiredRole): void
+{
+    require_role($requiredRole);
+}
+
+function require_admin(): void
+{
+    require_role(1);
+}
+
+function require_student(): void
+{
+    require_role(2);
+}
+
+function require_teacher(): void
+{
+    require_role(3);
 }
 
 function auth_redirect_by_role(): void
@@ -137,7 +165,12 @@ function auth_redirect_by_role(): void
     }
 
     if ($role === 2) {
-        header('Location: student.php');
+        header('Location: dashboard.php');
+        exit;
+    }
+
+    if ($role === 3) {
+        header('Location: teacher/dashboard.php');
         exit;
     }
 

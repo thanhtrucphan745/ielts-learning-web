@@ -9,13 +9,14 @@ $totalUsers = 0;
 $adminUsers = 0;
 $studentUsers = 0;
 
-$query = "SELECT COUNT(*) AS total_users, SUM(CASE WHEN role = 1 THEN 1 ELSE 0 END) AS admin_users, SUM(CASE WHEN role = 2 THEN 1 ELSE 0 END) AS student_users FROM users";
+$query = "SELECT COUNT(*) AS total_users, SUM(CASE WHEN role = 1 THEN 1 ELSE 0 END) AS admin_users, SUM(CASE WHEN role = 2 THEN 1 ELSE 0 END) AS student_users, SUM(CASE WHEN role = 3 THEN 1 ELSE 0 END) AS teacher_users FROM users";
 $result = $conn->query($query);
 if ($result) {
     $stats = $result->fetch_assoc();
     $totalUsers = (int) ($stats['total_users'] ?? 0);
     $adminUsers = (int) ($stats['admin_users'] ?? 0);
     $studentUsers = (int) ($stats['student_users'] ?? 0);
+    $teacherUsers = (int) ($stats['teacher_users'] ?? 0);
 }
 ?>
 <!DOCTYPE html>
@@ -49,6 +50,9 @@ if ($result) {
         </div>
         <div class="col-md-4">
             <div class="card shadow-sm"><div class="card-body"><h2 class="h6">Student users</h2><p class="display-6 mb-0"><?php echo $studentUsers; ?></p></div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm"><div class="card-body"><h2 class="h6">Teacher users</h2><p class="display-6 mb-0"><?php echo $teacherUsers; ?></p></div></div>
         </div>
     </div>
 </div>

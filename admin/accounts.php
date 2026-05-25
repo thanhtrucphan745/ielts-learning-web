@@ -7,7 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'], $_POST['ro
     $userId = (int) $_POST['user_id'];
     $role = (int) $_POST['role'];
 
-    if (in_array($role, [1, 2], true) && $userId > 0) {
+    if (in_array($role, [1, 2, 3], true) && $userId > 0) {
         $stmt = $conn->prepare('UPDATE users SET role = ? WHERE id = ?');
         if ($stmt) {
             $stmt->bind_param('ii', $role, $userId);
@@ -50,13 +50,14 @@ if ($message):
                                 <td><?php echo htmlspecialchars($account['username'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($account['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($account['phone'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><span class="badge badge-<?php echo ((int) $account['role'] === 1) ? 'danger' : 'primary'; ?>"><?php echo auth_role_label((int) $account['role']); ?></span></td>
+                                <td><span class="badge badge-<?php echo ((int) $account['role'] === 1) ? 'danger' : (((int) $account['role'] === 3) ? 'warning' : 'primary'); ?>"><?php echo auth_role_label((int) $account['role']); ?></span></td>
                                 <td>
                                     <form method="post" class="form-inline">
                                         <input type="hidden" name="user_id" value="<?php echo (int) $account['id']; ?>">
                                         <select name="role" class="form-control form-control-sm mr-2">
                                             <option value="1"<?php echo ((int) $account['role'] === 1) ? ' selected' : ''; ?>>Quản trị viên</option>
                                             <option value="2"<?php echo ((int) $account['role'] === 2) ? ' selected' : ''; ?>>Học viên</option>
+                                            <option value="3"<?php echo ((int) $account['role'] === 3) ? ' selected' : ''; ?>>Giảng viên</option>
                                         </select>
                                         <button class="btn btn-sm btn-primary">Lưu</button>
                                     </form>

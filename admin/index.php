@@ -9,18 +9,20 @@ $counts = [
 	'users' => 0,
 	'admins' => 0,
 	'students' => 0,
+	'teachers' => 0,
 	'posts' => 0,
 	'feedback' => 0,
 	'unread_feedback' => 0,
 	'sessions' => 0,
 ];
 
-$result = $conn->query('SELECT COUNT(*) AS total, SUM(CASE WHEN role = 1 THEN 1 ELSE 0 END) AS admins, SUM(CASE WHEN role = 2 THEN 1 ELSE 0 END) AS students FROM users');
+$result = $conn->query('SELECT COUNT(*) AS total, SUM(CASE WHEN role = 1 THEN 1 ELSE 0 END) AS admins, SUM(CASE WHEN role = 2 THEN 1 ELSE 0 END) AS students, SUM(CASE WHEN role = 3 THEN 1 ELSE 0 END) AS teachers FROM users');
 if ($result) {
 	$row = $result->fetch_assoc() ?: [];
 	$counts['users'] = (int) ($row['total'] ?? 0);
 	$counts['admins'] = (int) ($row['admins'] ?? 0);
 	$counts['students'] = (int) ($row['students'] ?? 0);
+	$counts['teachers'] = (int) ($row['teachers'] ?? 0);
 }
 
 $result = $conn->query('SELECT COUNT(*) AS total FROM site_posts');
@@ -88,7 +90,8 @@ admin_render_header('Trang quản trị', 'dashboard', 'Truy cập nhanh các kh
 			<div class="card-body">
 				<p class="mb-2">Tổng người dùng: <strong><?php echo $counts['users']; ?></strong></p>
 				<p class="mb-2">Quản trị viên: <strong><?php echo $counts['admins']; ?></strong></p>
-				<p class="mb-3">Học viên: <strong><?php echo $counts['students']; ?></strong></p>
+				<p class="mb-2">Học viên: <strong><?php echo $counts['students']; ?></strong></p>
+				<p class="mb-3">Giảng viên: <strong><?php echo $counts['teachers']; ?></strong></p>
 				<a href="users.php" class="btn btn-primary btn-sm mr-2">Người dùng</a>
 				<a href="accounts.php" class="btn btn-outline-primary btn-sm">Tài khoản</a>
 			</div>

@@ -50,6 +50,10 @@ if ($conn->connect_error) {
     die("Kết nối thất bại: " . $conn->connect_error);
 }
 
+if (!mysqli_set_charset($conn, 'utf8mb4')) {
+    die('Không thể thiết lập utf8mb4 cho kết nối MySQL.');
+}
+
 if (!defined('COZE_BOT_ID')) {
     define('COZE_BOT_ID', getenv('COZE_BOT_ID') ?: '');
 }

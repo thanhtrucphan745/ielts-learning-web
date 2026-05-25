@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th5 24, 2026 lúc 04:26 PM
+-- Thời gian đã tạo: Th5 25, 2026 lúc 07:46 AM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
--- Phiên bản PHP: 8.0.30
+-- Phiên bản PHP: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -324,6 +324,60 @@ INSERT INTO `skills` (`id`, `name`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Cấu trúc bảng cho bảng `skill_uploads`
+--
+
+CREATE TABLE `skill_uploads` (
+  `id` int(11) NOT NULL,
+  `skill` varchar(50) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `filename` varchar(255) NOT NULL,
+  `original_name` varchar(255) DEFAULT NULL,
+  `mime` varchar(100) DEFAULT NULL,
+  `size` int(11) DEFAULT NULL,
+  `uploaded_by` int(11) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `skill_uploads`
+--
+
+INSERT INTO `skill_uploads` (`id`, `skill`, `title`, `description`, `filename`, `original_name`, `mime`, `size`, `uploaded_by`, `created_at`) VALUES
+(1, 'reading', 'Reading B1 - A Healthy Lifestyle', 'Practice reading test about health and daily habits', '20260524_165744_8547832233d4_reading_b1_healthy_lifestyle.json', 'reading_b1_healthy_lifestyle.json', 'application/json', 2014, 13, '2026-05-24 21:57:44'),
+(2, 'reading', 'Reading B1 - The London Eye', 'Diagnostic reading test for B1 level', '20260524_165946_feefeb91ee14_reading_b1_london_eye.json', 'reading_b1_london_eye.json', 'application/json', 1764, 13, '2026-05-24 21:59:46');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `student_questions`
+--
+
+CREATE TABLE `student_questions` (
+  `id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `question_content` text NOT NULL,
+  `answer_content` text DEFAULT NULL,
+  `status` enum('pending','answered') DEFAULT 'pending',
+  `created_at` datetime DEFAULT current_timestamp(),
+  `answered_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `student_questions`
+--
+
+INSERT INTO `student_questions` (`id`, `student_id`, `teacher_id`, `title`, `question_content`, `answer_content`, `status`, `created_at`, `answered_at`) VALUES
+(1, 2, 13, 'Em chưa hiểu bài Reading', 'Cô ơi em chưa hiểu cách chọn đáp án đúng trong bài Reading ạ.', NULL, 'pending', '2026-05-25 12:23:23', NULL),
+(2, 8, 13, 'Thắc mắc bài Listening', 'Em nghe không kịp phần điền từ thì nên luyện như thế nào ạ?', NULL, 'pending', '2026-05-25 12:23:23', NULL),
+(3, 9, 13, 'Hỏi về Writing Task 1', 'Cô cho em hỏi mở bài Writing Task 1 nên paraphrase như thế nào ạ?', 'Em nên đổi cấu trúc câu và thay từ đồng nghĩa, không copy y nguyên đề bài nhé.', 'answered', '2026-05-25 12:23:23', '2026-05-25 12:23:44');
+
+-- --------------------------------------------------------
+
+--
 -- Cấu trúc bảng cho bảng `study_sessions`
 --
 
@@ -346,7 +400,33 @@ CREATE TABLE `study_sessions` (
 INSERT INTO `study_sessions` (`id`, `user_id`, `skill`, `activity_type`, `score`, `max_score`, `band_score`, `duration_minutes`, `created_at`) VALUES
 (1, 1, 'reading', 'diagnostic_test', 2, 5, 4.0, 20, '2026-05-11 01:46:02'),
 (2, 15, 'reading', 'diagnostic_test', 1, 5, 2.0, 20, '2026-05-12 15:22:53'),
-(3, 1, 'reading', 'diagnostic_test', 1, 5, 2.0, 20, '2026-05-12 16:18:32');
+(3, 1, 'reading', 'diagnostic_test', 1, 5, 2.0, 20, '2026-05-12 16:18:32'),
+(4, 2, 'reading', 'json_test', 2, 5, 4.5, 20, '2026-05-24 21:58:29'),
+(5, 2, 'reading', 'json_test', 2, 5, 4.5, 20, '2026-05-24 22:00:16');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `teacher_students`
+--
+
+CREATE TABLE `teacher_students` (
+  `id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `teacher_students`
+--
+
+INSERT INTO `teacher_students` (`id`, `teacher_id`, `student_id`, `created_at`) VALUES
+(1, 13, 2, '2026-05-25 12:23:07'),
+(2, 13, 8, '2026-05-25 12:23:07'),
+(3, 13, 9, '2026-05-25 12:23:07'),
+(4, 13, 10, '2026-05-25 12:23:07'),
+(5, 13, 15, '2026-05-25 12:23:07');
 
 -- --------------------------------------------------------
 
@@ -386,7 +466,7 @@ CREATE TABLE `users` (
   `password` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `username` varchar(50) DEFAULT NULL,
-  `role` int(11) DEFAULT 0 COMMENT '1:admin, 2:người học ',
+  `role` int(11) DEFAULT 0 COMMENT '1:admin, 2:người học , 3: giảng viên\r\n',
   `phone` varchar(15) DEFAULT NULL,
   `avatar` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -401,8 +481,8 @@ INSERT INTO `users` (`id`, `name`, `email`, `password`, `created_at`, `username`
 (8, 'Phương', 'phuong@gmail.com', '123456', '2026-04-17 14:49:29', NULL, 2, '0912345678', 'default.jpg'),
 (9, 'Quân', 'quan@gmail.com', '123456', '2026-04-17 14:49:29', NULL, 2, '0912345678', 'default.jpg'),
 (10, 'Trang', 'trang@gmail.com', '123456', '2026-04-17 14:49:29', NULL, 2, '0912345678', 'default.jpg'),
-(13, 'Thanh Trúc', 'truc@gmail.com', '745', '2026-05-07 17:56:37', NULL, 0, NULL, NULL),
-(14, 'Trần Nga', 'ngatran@gmail.com', '123', '2026-05-07 17:58:35', NULL, 0, NULL, NULL),
+(13, 'Thanh Trúc', 'truc@gmail.com', '745', '2026-05-07 17:56:37', 'giangvien', 3, NULL, NULL),
+(14, 'Trần Nga', 'ngatran@gmail.com', '123', '2026-05-07 17:58:35', NULL, 3, NULL, NULL),
 (15, 'Trúc Phan', 'trup@gmai.com', '$2y$10$vQsEdLgsrHYK73mki1gFwuYBVx5fD7if.CmeirziXQ6sC8wjQyHtS', '2026-05-12 08:22:01', 'trucphan', 2, '098765432', '');
 
 -- --------------------------------------------------------
@@ -438,6 +518,7 @@ CREATE TABLE `user_streaks` (
 
 INSERT INTO `user_streaks` (`user_id`, `current_streak`, `best_streak`, `last_active_date`, `updated_at`) VALUES
 (1, 1, 1, '2026-05-12', '2026-05-12 16:18:32'),
+(2, 1, 1, '2026-05-24', '2026-05-24 21:58:29'),
 (15, 1, 1, '2026-05-12', '2026-05-12 15:22:53');
 
 --
@@ -514,11 +595,30 @@ ALTER TABLE `skills`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Chỉ mục cho bảng `skill_uploads`
+--
+ALTER TABLE `skill_uploads`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Chỉ mục cho bảng `student_questions`
+--
+ALTER TABLE `student_questions`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Chỉ mục cho bảng `study_sessions`
 --
 ALTER TABLE `study_sessions`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_study_sessions_user_created` (`user_id`,`created_at`);
+
+--
+-- Chỉ mục cho bảng `teacher_students`
+--
+ALTER TABLE `teacher_students`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_teacher_student` (`teacher_id`,`student_id`);
 
 --
 -- Chỉ mục cho bảng `tests`
@@ -616,10 +716,28 @@ ALTER TABLE `skills`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
+-- AUTO_INCREMENT cho bảng `skill_uploads`
+--
+ALTER TABLE `skill_uploads`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT cho bảng `student_questions`
+--
+ALTER TABLE `student_questions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
 -- AUTO_INCREMENT cho bảng `study_sessions`
 --
 ALTER TABLE `study_sessions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT cho bảng `teacher_students`
+--
+ALTER TABLE `teacher_students`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT cho bảng `tests`

@@ -5,8 +5,7 @@ require_once __DIR__ . '/auth.php';
 auth_start_session();
 
 if (auth_user()) {
-    header('Location: index.php');
-    exit;
+    auth_redirect_by_role();
 }
 
 $error = '';
@@ -18,8 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $result = auth_login($conn, $identifier, $password);
     if (!empty($result['ok'])) {
-        header('Location: index.php');
-        exit;
+        auth_redirect_by_role();
     }
 
     $error = (string) ($result['message'] ?? 'Login failed.');

@@ -118,6 +118,9 @@ function nav_active($paths) {
                         <?php if ((int) ($currentUser['role'] ?? 0) === 1): ?>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item fw-semibold text-primary" href="admin/index.php"><i class="fas fa-shield-alt me-2"></i>Quản trị</a></li>
+                        <?php elseif ((int) ($currentUser['role'] ?? 0) === 3): ?>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item fw-semibold text-warning" href="teacher/dashboard.php"><i class="fas fa-chalkboard-teacher me-2"></i>Giảng viên</a></li>
                         <?php endif; ?>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-power-off me-2"></i>Đăng xuất</a></li>

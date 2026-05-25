@@ -5,18 +5,20 @@ $stats = [
     'users' => 0,
     'admins' => 0,
     'students' => 0,
+    'teachers' => 0,
     'contacts' => 0,
     'unread_contacts' => 0,
     'sessions' => 0,
     'posts' => 0,
 ];
 
-$result = $conn->query('SELECT COUNT(*) AS total, SUM(CASE WHEN role = 1 THEN 1 ELSE 0 END) AS admins, SUM(CASE WHEN role = 2 THEN 1 ELSE 0 END) AS students FROM users');
+$result = $conn->query('SELECT COUNT(*) AS total, SUM(CASE WHEN role = 1 THEN 1 ELSE 0 END) AS admins, SUM(CASE WHEN role = 2 THEN 1 ELSE 0 END) AS students, SUM(CASE WHEN role = 3 THEN 1 ELSE 0 END) AS teachers FROM users');
 if ($result) {
     $row = $result->fetch_assoc() ?: [];
     $stats['users'] = (int) ($row['total'] ?? 0);
     $stats['admins'] = (int) ($row['admins'] ?? 0);
     $stats['students'] = (int) ($row['students'] ?? 0);
+    $stats['teachers'] = (int) ($row['teachers'] ?? 0);
 }
 
 $result = $conn->query('SELECT COUNT(*) AS total, SUM(CASE WHEN COALESCE(is_read,0) = 0 THEN 1 ELSE 0 END) AS unread FROM contact_messages');
@@ -59,7 +61,7 @@ admin_render_header('Thống kê', 'statistics', 'Tổng quan hoạt động c�
 </div>
 
 <div class="row mb-4">
-    <div class="col-lg-6 mb-4"><div class="card content-card shadow h-100"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Phân bổ người dùng</h6></div><div class="card-body"><p class="mb-2">Quản trị viên: <strong><?php echo $stats['admins']; ?></strong></p><p class="mb-0">Học viên: <strong><?php echo $stats['students']; ?></strong></p></div></div></div>
+    <div class="col-lg-6 mb-4"><div class="card content-card shadow h-100"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Phân bổ người dùng</h6></div><div class="card-body"><p class="mb-2">Quản trị viên: <strong><?php echo $stats['admins']; ?></strong></p><p class="mb-2">Học viên: <strong><?php echo $stats['students']; ?></strong></p><p class="mb-0">Giảng viên: <strong><?php echo $stats['teachers']; ?></strong></p></div></div></div>
     <div class="col-lg-6 mb-4"><div class="card content-card shadow h-100"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Trạng thái phản hồi</h6></div><div class="card-body"><p class="mb-2">Phản hồi chưa đọc: <strong><?php echo $stats['unread_contacts']; ?></strong></p><p class="mb-0 text-muted">Có thể đánh dấu đã đọc tại mục Phản hồi.</p></div></div></div>
 </div>
 

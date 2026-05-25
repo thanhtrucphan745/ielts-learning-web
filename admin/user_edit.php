@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = 'Vui lòng nhập họ tên, tên đăng nhập và email.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $message = 'Email không hợp lệ.';
-    } elseif (!in_array($role, [1, 2], true)) {
+    } elseif (!in_array($role, [1, 2, 3], true)) {
         $message = 'Vai trò không hợp lệ.';
     } else {
         $check = $conn->prepare('SELECT id FROM users WHERE (username = ? OR email = ?) AND id <> ? LIMIT 1');
@@ -116,6 +116,7 @@ if ($message):
                             <select class="form-control" name="role">
                                 <option value="1"<?php echo ((int) $user['role'] === 1) ? ' selected' : ''; ?>>Quản trị viên</option>
                                 <option value="2"<?php echo ((int) $user['role'] === 2) ? ' selected' : ''; ?>>Học viên</option>
+                                <option value="3"<?php echo ((int) $user['role'] === 3) ? ' selected' : ''; ?>>Giảng viên</option>
                             </select>
                         </div>
                         <div class="col-md-6 form-group">

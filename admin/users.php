@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
         $message = 'Vui lòng nhập đủ họ tên, tên đăng nhập, email và mật khẩu.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $message = 'Email không hợp lệ.';
-    } elseif (!in_array($role, [1, 2], true)) {
+    } elseif (!in_array($role, [1, 2, 3], true)) {
         $message = 'Vai trò không hợp lệ.';
     } else {
         $check = $conn->prepare('SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1');
@@ -56,7 +56,7 @@ if ($queryText !== '') {
     $types .= 'ssss';
 }
 
-if (in_array($roleFilter, ['1', '2'], true)) {
+if (in_array($roleFilter, ['1', '2', '3'], true)) {
     $conditions[] = 'role = ?';
     $params[] = (int) $roleFilter;
     $types .= 'i';
@@ -87,8 +87,8 @@ if ($stmt) {
     $stmt->close();
 }
 
-$totals = ['total' => 0, 'admin' => 0, 'student' => 0];
-$result = $conn->query("SELECT COUNT(*) AS total, SUM(CASE WHEN role = 1 THEN 1 ELSE 0 END) AS admin_users, SUM(CASE WHEN role = 2 THEN 1 ELSE 0 END) AS student_users FROM users");
+$totals = ['total' => 0, 'admin' => 0, 'student' => 0, 'teacher' => 0];
+$result = $conn->query("SELECT COUNT(*) AS total, SUM(CASE WHEN role = 1 THEN 1 ELSE 0 END) AS admin_users, SUM(CASE WHEN role = 2 THEN 1 ELSE 0 END) AS student_users, SUM(CASE WHEN role = 3 THEN 1 ELSE 0 END) AS teacher_users FROM users");
 if ($result) {
     $totals = $result->fetch_assoc() ?: $totals;
 }
@@ -99,6 +99,9 @@ admin_render_header('Users Management', 'users', 'Manage user records');
     <div class="col-xl-4 col-md-6 mb-3"><div class="card content-card border-left-primary h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Tổng người dùng</div><div class="h4 mb-0 font-weight-bold text-gray-800"><?php echo (int) ($totals['total'] ?? 0); ?></div></div></div></div>
     <div class="col-xl-4 col-md-6 mb-3"><div class="card content-card border-left-success h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-success text-uppercase mb-1">Quản trị viên</div><div class="h4 mb-0 font-weight-bold text-gray-800"><?php echo (int) ($totals['admin_users'] ?? 0); ?></div></div></div></div>
     <div class="col-xl-4 col-md-6 mb-3"><div class="card content-card border-left-info h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-info text-uppercase mb-1">Học viên</div><div class="h4 mb-0 font-weight-bold text-gray-800"><?php echo (int) ($totals['student_users'] ?? 0); ?></div></div></div></div>
+</div>
+<div class="row mb-4">
+    <div class="col-xl-4 col-md-6 mb-3"><div class="card content-card border-left-warning h-100 py-2"><div class="card-body"><div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Giảng viên</div><div class="h4 mb-0 font-weight-bold text-gray-800"><?php echo (int) ($totals['teacher_users'] ?? 0); ?></div></div></div></div>
 </div>
 
 <?php if ($message): ?>
@@ -116,7 +119,7 @@ admin_render_header('Users Management', 'users', 'Manage user records');
                 <div class="col-md-4 form-group"><label>Email</label><input type="email" class="form-control" name="email" required></div>
                 <div class="col-md-4 form-group"><label>Số điện thoại</label><input class="form-control" name="phone"></div>
                 <div class="col-md-4 form-group"><label>Mật khẩu</label><input type="password" class="form-control" name="password" required></div>
-                <div class="col-md-4 form-group"><label>Vai trò</label><select class="form-control" name="role"><option value="2">Học viên</option><option value="1">Quản trị viên</option></select></div>
+                <div class="col-md-4 form-group"><label>Vai trò</label><select class="form-control" name="role"><option value="2">Học viên</option><option value="3">Giảng viên</option><option value="1">Quản trị viên</option></select></div>
             </div>
             <button class="btn btn-primary">Tạo người dùng</button>
         </form>
@@ -132,6 +135,7 @@ admin_render_header('Users Management', 'users', 'Manage user records');
                 <option value="all"<?php echo $roleFilter === 'all' ? ' selected' : ''; ?>>Tất cả vai trò</option>
                 <option value="1"<?php echo $roleFilter === '1' ? ' selected' : ''; ?>>Quản trị viên</option>
                 <option value="2"<?php echo $roleFilter === '2' ? ' selected' : ''; ?>>Học viên</option>
+                <option value="3"<?php echo $roleFilter === '3' ? ' selected' : ''; ?>>Giảng viên</option>
             </select>
             <button class="btn btn-sm btn-primary">Lọc</button>
         </form>
@@ -155,7 +159,7 @@ admin_render_header('Users Management', 'users', 'Manage user records');
                                 <td><?php echo htmlspecialchars($user['username'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($user['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars($user['phone'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><span class="badge badge-<?php echo ((int) $user['role'] === 1) ? 'danger' : 'primary'; ?>"><?php echo auth_role_label((int) $user['role']); ?></span></td>
+                                <td><span class="badge badge-<?php echo ((int) $user['role'] === 1) ? 'danger' : (((int) $user['role'] === 3) ? 'warning' : 'primary'); ?>"><?php echo auth_role_label((int) $user['role']); ?></span></td>
                                 <td>
                                     <a href="user_edit.php?id=<?php echo (int) $user['id']; ?>" class="btn btn-sm btn-info mb-1">Sửa</a>
                                     <a href="user_delete.php?id=<?php echo (int) $user['id']; ?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('Xóa người dùng này?');">Xóa</a>
