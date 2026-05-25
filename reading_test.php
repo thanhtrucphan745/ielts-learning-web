@@ -184,6 +184,60 @@ function reading_test_load_upload(mysqli $conn, int $id): array
     ];
 }
 
+function reading_test_save_attempt(mysqli $conn, array $user, int $testId, string $skill, string $testTitle, int $score, int $totalQuestions, float $bandScore, array $questions, array $questionResults): ?int
+{
+    if (!ensure_test_attempt_tables($conn)) {
+        return null;
+    }
+
+    $insertAttempt = $conn->prepare('INSERT INTO test_attempts (student_id, skill, test_id, test_title, score, total_questions, band_score, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
+    if (!$insertAttempt) {
+        return null;
+    }
+
+    $studentId = (int) $user['id'];
+    $insertAttempt->bind_param('isisiid', $studentId, $skill, $testId, $testTitle, $score, $totalQuestions, $bandScore);
+    if (!$insertAttempt->execute()) {
+        $insertAttempt->close();
+        return null;
+    }
+
+    $attemptId = $insertAttempt->insert_id;
+    $insertAttempt->close();
+
+    $insertAnswer = $conn->prepare('INSERT INTO test_attempt_answers (attempt_id, question_index, question_text, selected_answer, correct_answer, selected_text, correct_text, is_correct, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    if (!$insertAnswer) {
+        return $attemptId;
+    }
+
+    foreach ($questions as $index => $question) {
+        $questionText = trim((string) ($question['question'] ?? ''));
+        $correctAnswer = (int) ($question['answer'] ?? -1);
+        $result = $questionResults[$index] ?? null;
+        $selectedAnswer = $result !== null ? (int) ($result['userAnswer'] ?? -1) : -1;
+        $selectedAnswer = $selectedAnswer >= 0 ? $selectedAnswer : null;
+        $selectedText = null;
+        $correctText = '';
+
+        $options = is_array($question['options'] ?? null) ? $question['options'] : [];
+        if ($selectedAnswer !== null && isset($options[$selectedAnswer])) {
+            $selectedText = trim((string) $options[$selectedAnswer]);
+        }
+        if (isset($options[$correctAnswer])) {
+            $correctText = trim((string) $options[$correctAnswer]);
+        }
+
+        $isCorrect = $result !== null && !empty($result['isCorrect']) ? 1 : 0;
+        $explanation = trim((string) ($question['explanation'] ?? ''));
+
+        $insertAnswer->bind_param('iisiissis', $attemptId, $index, $questionText, $selectedAnswer, $correctAnswer, $selectedText, $correctText, $isCorrect, $explanation);
+        $insertAnswer->execute();
+    }
+
+    $insertAnswer->close();
+    return $attemptId;
+}
+
 $selectedId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $submitted = $_SERVER['REQUEST_METHOD'] === 'POST';
 $load = reading_test_load_upload($conn, $selectedId);
@@ -200,6 +254,7 @@ $percentage = 0.0;
 $bandScore = null;
 $feedback = '';
 $questionResults = [];
+$attemptId = null;
 $practiceSummary = [
     'attempts' => 0,
     'bestScore' => 0,
@@ -238,6 +293,18 @@ if ($submitted && $load['ok']) {
     if ($currentUser && isset($currentUser['id'])) {
         streak_mark_activity($conn, (int) $currentUser['id'], 'reading', 'reading_test', $score, max(1, $totalQuestions), (float) $bandScore, 20);
         $practiceSummary = streak_get_practice_summary($conn, (int) $currentUser['id'], 'reading');
+        $attemptId = reading_test_save_attempt(
+            $conn,
+            $currentUser,
+            $selectedId,
+            'reading',
+            (string) ($payload['title'] ?? ($record['title'] ?? 'Reading Test')),
+            $score,
+            $totalQuestions,
+            (float) $bandScore,
+            $questions,
+            $questionResults
+        );
     }
 }
 ?>
@@ -328,6 +395,9 @@ if ($submitted && $load['ok']) {
                                     </div>
                                     <p class="card-text fs-5 mb-4"><?php echo htmlspecialchars($feedback, ENT_QUOTES, 'UTF-8'); ?></p>
                                     <a href="reading_test.php?id=<?php echo htmlspecialchars((string) $selectedId, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-primary me-2">Làm lại</a>
+                                    <?php if ($attemptId !== null): ?>
+                                        <a href="result_detail.php?id=<?php echo htmlspecialchars((string) $attemptId, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-success me-2">Xem trong Bài đã làm</a>
+                                    <?php endif; ?>
                                     <a href="reading.php" class="btn btn-outline-primary">Back to Reading</a>
                                 </div>
                             </div>

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th5 25, 2026 lúc 07:46 AM
+-- Thời gian đã tạo: Th5 25, 2026 lúc 09:49 AM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.2.12
 
@@ -333,6 +333,10 @@ CREATE TABLE `skill_uploads` (
   `title` varchar(255) DEFAULT NULL,
   `description` text DEFAULT NULL,
   `filename` varchar(255) NOT NULL,
+  `audio_filename` varchar(255) DEFAULT NULL,
+  `audio_original_name` varchar(255) DEFAULT NULL,
+  `audio_mime` varchar(100) DEFAULT NULL,
+  `audio_size` int(11) DEFAULT NULL,
   `original_name` varchar(255) DEFAULT NULL,
   `mime` varchar(100) DEFAULT NULL,
   `size` int(11) DEFAULT NULL,
@@ -344,9 +348,34 @@ CREATE TABLE `skill_uploads` (
 -- Đang đổ dữ liệu cho bảng `skill_uploads`
 --
 
-INSERT INTO `skill_uploads` (`id`, `skill`, `title`, `description`, `filename`, `original_name`, `mime`, `size`, `uploaded_by`, `created_at`) VALUES
-(1, 'reading', 'Reading B1 - A Healthy Lifestyle', 'Practice reading test about health and daily habits', '20260524_165744_8547832233d4_reading_b1_healthy_lifestyle.json', 'reading_b1_healthy_lifestyle.json', 'application/json', 2014, 13, '2026-05-24 21:57:44'),
-(2, 'reading', 'Reading B1 - The London Eye', 'Diagnostic reading test for B1 level', '20260524_165946_feefeb91ee14_reading_b1_london_eye.json', 'reading_b1_london_eye.json', 'application/json', 1764, 13, '2026-05-24 21:59:46');
+INSERT INTO `skill_uploads` (`id`, `skill`, `title`, `description`, `filename`, `audio_filename`, `audio_original_name`, `audio_mime`, `audio_size`, `original_name`, `mime`, `size`, `uploaded_by`, `created_at`) VALUES
+(1, 'reading', 'Reading B1 - A Healthy Lifestyle', 'Practice reading test about health and daily habits', '20260524_165744_8547832233d4_reading_b1_healthy_lifestyle.json', NULL, NULL, NULL, NULL, 'reading_b1_healthy_lifestyle.json', 'application/json', 2014, 13, '2026-05-24 21:57:44'),
+(2, 'reading', 'Reading B1 - The London Eye', 'Diagnostic reading test for B1 level', '20260524_165946_feefeb91ee14_reading_b1_london_eye.json', NULL, NULL, NULL, NULL, 'reading_b1_london_eye.json', 'application/json', 1764, 13, '2026-05-24 21:59:46'),
+(4, 'writing', 'Writing Task 1 - Email to a Friend', 'Write an informal email about your holiday.', '20260525_091059_6f3c88c34223_writing_task1_email_friend.json', NULL, NULL, NULL, NULL, 'writing_task1_email_friend.json', 'application/json', 412, 1, '2026-05-25 14:10:59'),
+(5, 'speaking', 'Speaking B1 - Personal Information', 'Speaking practice about personal information and daily life.', '20260525_094802_8a1dc8f44f40_speaking_b1_personal_info.json', NULL, NULL, NULL, NULL, 'speaking_b1_personal_info.json', 'application/json', 696, 1, '2026-05-25 14:48:02');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `speaking_submissions`
+--
+
+CREATE TABLE `speaking_submissions` (
+  `id` int(11) NOT NULL,
+  `test_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `answer_text` text DEFAULT NULL,
+  `audio_filename` varchar(255) DEFAULT NULL,
+  `audio_original_name` varchar(255) DEFAULT NULL,
+  `audio_mime` varchar(100) DEFAULT NULL,
+  `audio_size` int(11) DEFAULT NULL,
+  `score` decimal(4,2) DEFAULT NULL,
+  `feedback` text DEFAULT NULL,
+  `status` enum('submitted','graded') DEFAULT 'submitted',
+  `created_at` datetime DEFAULT current_timestamp(),
+  `submitted_at` datetime DEFAULT current_timestamp(),
+  `graded_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
 -- --------------------------------------------------------
 
@@ -402,7 +431,8 @@ INSERT INTO `study_sessions` (`id`, `user_id`, `skill`, `activity_type`, `score`
 (2, 15, 'reading', 'diagnostic_test', 1, 5, 2.0, 20, '2026-05-12 15:22:53'),
 (3, 1, 'reading', 'diagnostic_test', 1, 5, 2.0, 20, '2026-05-12 16:18:32'),
 (4, 2, 'reading', 'json_test', 2, 5, 4.5, 20, '2026-05-24 21:58:29'),
-(5, 2, 'reading', 'json_test', 2, 5, 4.5, 20, '2026-05-24 22:00:16');
+(5, 2, 'reading', 'json_test', 2, 5, 4.5, 20, '2026-05-24 22:00:16'),
+(6, 2, 'reading', 'reading_test', 1, 5, 3.0, 20, '2026-05-25 14:30:21');
 
 -- --------------------------------------------------------
 
@@ -441,6 +471,61 @@ CREATE TABLE `tests` (
   `duration` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `test_attempts`
+--
+
+CREATE TABLE `test_attempts` (
+  `id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `skill` varchar(50) NOT NULL,
+  `test_id` int(11) NOT NULL,
+  `test_title` varchar(255) NOT NULL,
+  `score` int(11) NOT NULL DEFAULT 0,
+  `total_questions` int(11) NOT NULL DEFAULT 0,
+  `band_score` decimal(4,2) DEFAULT NULL,
+  `submitted_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `test_attempts`
+--
+
+INSERT INTO `test_attempts` (`id`, `student_id`, `skill`, `test_id`, `test_title`, `score`, `total_questions`, `band_score`, `submitted_at`) VALUES
+(1, 2, 'reading', 2, 'Reading B1 - The London Eye', 1, 5, 3.00, '2026-05-25 14:30:21');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `test_attempt_answers`
+--
+
+CREATE TABLE `test_attempt_answers` (
+  `id` int(11) NOT NULL,
+  `attempt_id` int(11) NOT NULL,
+  `question_index` int(11) NOT NULL,
+  `question_text` text NOT NULL,
+  `selected_answer` int(11) DEFAULT NULL,
+  `correct_answer` int(11) NOT NULL,
+  `selected_text` text DEFAULT NULL,
+  `correct_text` text DEFAULT NULL,
+  `is_correct` tinyint(1) NOT NULL DEFAULT 0,
+  `explanation` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `test_attempt_answers`
+--
+
+INSERT INTO `test_attempt_answers` (`id`, `attempt_id`, `question_index`, `question_text`, `selected_answer`, `correct_answer`, `selected_text`, `correct_text`, `is_correct`, `explanation`) VALUES
+(1, 1, 0, 'Where is the London Eye located?', 3, 0, 'Next to Oxford University', 'On the South Bank of the River Thames', 0, ''),
+(2, 1, 1, 'When was the London Eye opened to the public?', 0, 1, 'March 9, 1999', 'March 9, 2000', 0, ''),
+(3, 1, 2, 'How tall is the London Eye?', 2, 2, '135 metres', '135 metres', 1, ''),
+(4, 1, 3, 'How many passenger capsules does it have?', 0, 2, '25', '32', 0, ''),
+(5, 1, 4, 'How long does a complete rotation take?', 3, 2, 'About 60 minutes', 'About 30 minutes', 0, '');
 
 -- --------------------------------------------------------
 
@@ -518,8 +603,28 @@ CREATE TABLE `user_streaks` (
 
 INSERT INTO `user_streaks` (`user_id`, `current_streak`, `best_streak`, `last_active_date`, `updated_at`) VALUES
 (1, 1, 1, '2026-05-12', '2026-05-12 16:18:32'),
-(2, 1, 1, '2026-05-24', '2026-05-24 21:58:29'),
+(2, 2, 2, '2026-05-25', '2026-05-25 14:30:21'),
 (15, 1, 1, '2026-05-12', '2026-05-12 15:22:53');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `writing_submissions`
+--
+
+CREATE TABLE `writing_submissions` (
+  `id` int(11) NOT NULL,
+  `test_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `answer_text` text NOT NULL,
+  `word_count` int(11) NOT NULL DEFAULT 0,
+  `score` decimal(4,2) DEFAULT NULL,
+  `feedback` text DEFAULT NULL,
+  `status` enum('submitted','graded') DEFAULT 'submitted',
+  `created_at` datetime DEFAULT current_timestamp(),
+  `submitted_at` datetime DEFAULT current_timestamp(),
+  `graded_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
 --
 -- Chỉ mục cho các bảng đã đổ
@@ -601,6 +706,12 @@ ALTER TABLE `skill_uploads`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Chỉ mục cho bảng `speaking_submissions`
+--
+ALTER TABLE `speaking_submissions`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Chỉ mục cho bảng `student_questions`
 --
 ALTER TABLE `student_questions`
@@ -627,6 +738,18 @@ ALTER TABLE `tests`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Chỉ mục cho bảng `test_attempts`
+--
+ALTER TABLE `test_attempts`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Chỉ mục cho bảng `test_attempt_answers`
+--
+ALTER TABLE `test_attempt_answers`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Chỉ mục cho bảng `test_questions`
 --
 ALTER TABLE `test_questions`
@@ -650,6 +773,12 @@ ALTER TABLE `user_progress`
 --
 ALTER TABLE `user_streaks`
   ADD PRIMARY KEY (`user_id`);
+
+--
+-- Chỉ mục cho bảng `writing_submissions`
+--
+ALTER TABLE `writing_submissions`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- AUTO_INCREMENT cho các bảng đã đổ
@@ -719,7 +848,13 @@ ALTER TABLE `skills`
 -- AUTO_INCREMENT cho bảng `skill_uploads`
 --
 ALTER TABLE `skill_uploads`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT cho bảng `speaking_submissions`
+--
+ALTER TABLE `speaking_submissions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT cho bảng `student_questions`
@@ -731,7 +866,7 @@ ALTER TABLE `student_questions`
 -- AUTO_INCREMENT cho bảng `study_sessions`
 --
 ALTER TABLE `study_sessions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT cho bảng `teacher_students`
@@ -746,6 +881,18 @@ ALTER TABLE `tests`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT cho bảng `test_attempts`
+--
+ALTER TABLE `test_attempts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT cho bảng `test_attempt_answers`
+--
+ALTER TABLE `test_attempt_answers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT cho bảng `users`
 --
 ALTER TABLE `users`
@@ -755,6 +902,12 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT cho bảng `user_progress`
 --
 ALTER TABLE `user_progress`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT cho bảng `writing_submissions`
+--
+ALTER TABLE `writing_submissions`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --

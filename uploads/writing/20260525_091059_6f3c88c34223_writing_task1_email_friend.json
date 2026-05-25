@@ -1,0 +1,13 @@
+{
+  "title": "Writing Task 1 - Email to a Friend",
+  "description": "Write an informal email about your holiday.",
+  "prompt": "You recently went on a holiday. Write an email to your friend. In your email, describe where you went, what you did, and how you felt.",
+  "min_words": 120,
+  "max_words": 180,
+  "criteria": [
+    "Task Achievement",
+    "Coherence and Cohesion",
+    "Vocabulary",
+    "Grammar"
+  ]
+}

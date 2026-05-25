@@ -1,0 +1,30 @@
+{
+  "title": "Speaking B1 - Personal Information",
+  "description": "Speaking practice about personal information and daily life.",
+  "parts": [
+    {
+      "part": "Part 1",
+      "questions": [
+        "What is your full name?",
+        "Where do you live?",
+        "What do you usually do in your free time?"
+      ]
+    },
+    {
+      "part": "Part 2",
+      "cue_card": "Describe a teacher you like.",
+      "points": [
+        "Who this teacher is",
+        "What subject they teach",
+        "Why you like them"
+      ]
+    },
+    {
+      "part": "Part 3",
+      "questions": [
+        "Why are teachers important?",
+        "Do you prefer studying online or offline?"
+      ]
+    }
+  ]
+}

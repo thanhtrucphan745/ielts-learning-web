@@ -4,7 +4,16 @@ require_once __DIR__ . '/auth.php';
 auth_require_login();
 $user = auth_user();
 $role = (int) $user['role'];
-$roleLabel = auth_role_label($role);
+
+if ($role === 1) {
+    header('Location: admin/index.php');
+    exit;
+}
+
+if ($role === 2) {
+    header('Location: index.php');
+    exit;
+}
 
 if ($role === 3) {
     header('Location: teacher/dashboard.php');

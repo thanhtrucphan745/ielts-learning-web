@@ -165,7 +165,7 @@ function auth_redirect_by_role(): void
     }
 
     if ($role === 2) {
-        header('Location: dashboard.php');
+        header('Location: index.php');
         exit;
     }
 

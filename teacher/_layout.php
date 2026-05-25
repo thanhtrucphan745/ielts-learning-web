@@ -122,8 +122,10 @@ function teacher_render_header(string $title, string $subtitle, string $activeSe
     echo '<a class="' . $navClass('dashboard') . '" href="dashboard.php"><span>Tổng quan</span><span class="nav-pill">02</span></a>';
     echo '<a class="' . $navClass('students') . '" href="students.php"><span>Học sinh</span><span class="nav-pill">03</span></a>';
     echo '<a class="' . $navClass('lessons') . '" href="lessons.php"><span>Bài học/Bài thi</span><span class="nav-pill">04</span></a>';
-    echo '<a class="' . $navClass('questions') . '" href="questions.php"><span>Thắc mắc</span><span class="nav-pill">05</span></a>';
-    echo '<a class="' . $navClass('progress') . '" href="student_progress.php"><span>Tiến độ học sinh</span><span class="nav-pill">06</span></a>';
+    echo '<a class="' . $navClass('writing_submissions') . '" href="writing_submissions.php"><span>Bài Writing</span><span class="nav-pill">05</span></a>';
+    echo '<a class="' . $navClass('speaking_submissions') . '" href="speaking_submissions.php"><span>Bài Speaking</span><span class="nav-pill">06</span></a>';
+    echo '<a class="' . $navClass('questions') . '" href="questions.php"><span>Thắc mắc</span><span class="nav-pill">07</span></a>';
+    echo '<a class="' . $navClass('progress') . '" href="student_progress.php"><span>Tiến độ học sinh</span><span class="nav-pill">07</span></a>';
     echo '<a href="../logout.php"><span>Đăng xuất</span><span class="nav-pill">⎋</span></a>';
     echo '</nav>';
     echo '<div class="teacher-sidebar-footer"><div class="mini">Đăng nhập với vai trò giảng viên để quản lý học sinh, bài học và thắc mắc.</div></div>';

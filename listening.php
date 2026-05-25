@@ -13,9 +13,142 @@ $avatarPath = !empty($currentUser['avatar']) ? $currentUser['avatar'] : '';
 $avatarUrl = $avatarPath !== '' ? $avatarPath : '';
 $role = isset($currentUser['role']) ? (int) $currentUser['role'] : 0;
 
+function listening_validate_json_payload(array $payload): array
+{
+    if (!isset($payload['title']) || trim((string) $payload['title']) === '') {
+        return ['ok' => false, 'message' => 'JSON Listening phải có trường title.'];
+    }
+
+    if (!isset($payload['description']) || trim((string) $payload['description']) === '') {
+        return ['ok' => false, 'message' => 'JSON Listening phải có trường description.'];
+    }
+
+    if (!isset($payload['questions']) || !is_array($payload['questions']) || empty($payload['questions'])) {
+        return ['ok' => false, 'message' => 'JSON Listening phải có mảng questions hợp lệ.'];
+    }
+
+    foreach ($payload['questions'] as $index => $question) {
+        if (!is_array($question)) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' không hợp lệ.'];
+        }
+
+        if (!isset($question['question']) || trim((string) $question['question']) === '') {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' thiếu nội dung question.'];
+        }
+
+        if (!isset($question['options']) || !is_array($question['options']) || count($question['options']) < 2) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' phải có ít nhất 2 đáp án.'];
+        }
+
+        if (!array_key_exists('answer', $question) || !is_numeric($question['answer'])) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' thiếu answer hợp lệ.'];
+        }
+
+        if (array_key_exists('explanation', $question) && !is_string($question['explanation'])) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' có explanation không hợp lệ.'];
+        }
+
+        $answer = (int) $question['answer'];
+        $optionCount = count($question['options']);
+        if ($answer < 0 || $answer >= $optionCount || $answer > 3) {
+            return ['ok' => false, 'message' => 'Câu hỏi ' . ((int) $index + 1) . ' có answer không hợp lệ.'];
+        }
+    }
+
+    return ['ok' => true, 'message' => ''];
+}
+
+function listening_band_score(float $percentage): float
+{
+    if ($percentage >= 80) {
+        return 6.0;
+    }
+    if ($percentage >= 60) {
+        return 5.0;
+    }
+    if ($percentage >= 40) {
+        return 4.0;
+    }
+    if ($percentage >= 20) {
+        return 3.0;
+    }
+    return 2.0;
+}
+
+function listening_option_label(int $index): string
+{
+    return chr(65 + $index);
+}
+
+function listening_save_attempt(mysqli $conn, array $user, int $testId, string $skill, string $testTitle, int $score, int $totalQuestions, float $bandScore, array $questions, array $questionResults): ?int
+{
+    if (!ensure_test_attempt_tables($conn)) {
+        return null;
+    }
+
+    $insertAttempt = $conn->prepare('INSERT INTO test_attempts (student_id, skill, test_id, test_title, score, total_questions, band_score, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
+    if (!$insertAttempt) {
+        return null;
+    }
+
+    $studentId = (int) $user['id'];
+    $insertAttempt->bind_param('isisiid', $studentId, $skill, $testId, $testTitle, $score, $totalQuestions, $bandScore);
+    if (!$insertAttempt->execute()) {
+        $insertAttempt->close();
+        return null;
+    }
+
+    $attemptId = $insertAttempt->insert_id;
+    $insertAttempt->close();
+
+    $insertAnswer = $conn->prepare('INSERT INTO test_attempt_answers (attempt_id, question_index, question_text, selected_answer, correct_answer, selected_text, correct_text, is_correct, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    if (!$insertAnswer) {
+        return $attemptId;
+    }
+
+    foreach ($questions as $index => $question) {
+        $questionText = trim((string) ($question['question'] ?? ''));
+        $correctAnswer = (int) ($question['answer'] ?? -1);
+        $result = $questionResults[$index] ?? null;
+        $selectedAnswer = $result !== null ? (int) ($result['userAnswer'] ?? -1) : -1;
+        $selectedAnswer = $selectedAnswer >= 0 ? $selectedAnswer : null;
+        $selectedText = null;
+        $correctText = '';
+
+        $options = is_array($question['options'] ?? null) ? $question['options'] : [];
+        if ($selectedAnswer !== null && isset($options[$selectedAnswer])) {
+            $selectedText = trim((string) $options[$selectedAnswer]);
+        }
+        if (isset($options[$correctAnswer])) {
+            $correctText = trim((string) $options[$correctAnswer]);
+        }
+
+        $isCorrect = $result !== null && !empty($result['isCorrect']) ? 1 : 0;
+        $explanation = trim((string) ($question['explanation'] ?? ''));
+
+        $insertAnswer->bind_param('iisiissis', $attemptId, $index, $questionText, $selectedAnswer, $correctAnswer, $selectedText, $correctText, $isCorrect, $explanation);
+        $insertAnswer->execute();
+    }
+
+    $insertAnswer->close();
+    return $attemptId;
+}
+
+$selectedId = isset($_GET['test_id']) ? (int) $_GET['test_id'] : 0;
+$submitted = $_SERVER['REQUEST_METHOD'] === 'POST';
+$errorMessage = '';
+$record = null;
+$payload = null;
+$title = 'Listening';
+$description = '';
+$questions = [];
+$score = 0;
+$totalQuestions = 0;
+$percentage = 0.0;
 $bandScore = null;
 $feedback = '';
-$score = 0;
+$questionResults = [];
+$attemptId = null;
 $practiceSummary = [
     'attempts' => 0,
     'bestScore' => 0,
@@ -23,45 +156,125 @@ $practiceSummary = [
     'averageScore' => 0,
     'bestBandScore' => null,
 ];
+$items = [];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $correctAnswers = ['1_B', '2_A', '3_B', '4_C', '5_A'];
-    $userAnswers = [
-        isset($_POST['q1']) ? $_POST['q1'] : '',
-        isset($_POST['q2']) ? $_POST['q2'] : '',
-        isset($_POST['q3']) ? $_POST['q3'] : '',
-        isset($_POST['q4']) ? $_POST['q4'] : '',
-        isset($_POST['q5']) ? $_POST['q5'] : ''
-    ];
-    
-    $score = 0;
-    for ($i = 0; $i < 5; $i++) {
-        if ($userAnswers[$i] === $correctAnswers[$i]) {
-            $score++;
+if (!ensure_skill_uploads_table($conn)) {
+    $errorMessage = 'Chưa có bài Listening nào được upload.';
+} else {
+    if ($selectedId > 0) {
+        $stmt = $conn->prepare('SELECT * FROM skill_uploads WHERE id = ? AND skill = ? LIMIT 1');
+        if ($stmt) {
+            $skill = 'listening';
+            $stmt->bind_param('is', $selectedId, $skill);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $record = $result ? $result->fetch_assoc() : null;
+            $stmt->close();
         }
-    }
-    
-    $percentage = ($score / 5) * 100;
-    if ($percentage >= 80) {
-        $bandScore = 6;
-        $feedback = 'Excellent! You have strong listening comprehension skills (Band 6). You demonstrate 70-80% accuracy and can understand both main ideas and detailed information clearly. You are ready for authentic English content.';
-    } elseif ($percentage >= 60) {
-        $bandScore = 5;
-        $feedback = 'Good! You have competent listening skills (Band 5). You understand main ideas with 60-70% accuracy and catch most specific details. Continue practicing with varied authentic materials.';
-    } elseif ($percentage >= 40) {
-        $bandScore = 4;
-        $feedback = 'Fair! You have basic listening skills (Band 4). You can grasp main points with 50-60% accuracy, but often miss specific details. Focus on intensive listening practice with repetition.';
-    } elseif ($percentage >= 20) {
-        $bandScore = 2;
-        $feedback = 'You need more practice in listening (Band 2-3). You understand very little. Start with simple dialogues and clear audio, and listen to English content regularly.';
-    } else {
-        $bandScore = 0;
-        $feedback = 'Keep practicing! Listening comprehension develops over time (Band 0-1). We recommend starting with slow, clear audio materials and building your listening habits gradually.';
-    }
 
-    if ($currentUser && isset($currentUser['id'])) {
-        streak_mark_activity($conn, (int) $currentUser['id'], 'listening', 'diagnostic_test', $score, 5, (float) $bandScore, 20);
-        $practiceSummary = streak_get_practice_summary($conn, (int) $currentUser['id'], 'listening');
+        if (!$record) {
+            $errorMessage = 'Bài Listening không tồn tại.';
+        } else {
+            $jsonFileName = basename((string) ($record['filename'] ?? ''));
+            $audioFileName = basename((string) ($record['audio_filename'] ?? ''));
+
+            if ($jsonFileName === '' || $audioFileName === '') {
+                $errorMessage = 'Bài Listening thiếu file JSON hoặc audio.';
+            } else {
+                $jsonPath = __DIR__ . '/uploads/listening/' . $jsonFileName;
+                $audioPath = __DIR__ . '/uploads/listening/audio/' . $audioFileName;
+
+                if (!is_file($jsonPath)) {
+                    $errorMessage = 'Không tìm thấy file JSON của bài Listening.';
+                } elseif (!is_file($audioPath)) {
+                    $errorMessage = 'Không tìm thấy file audio của bài Listening.';
+                } else {
+                    $raw = @file_get_contents($jsonPath);
+                    $payload = is_string($raw) ? json_decode($raw, true) : null;
+                    if (!is_array($payload)) {
+                        $errorMessage = 'File JSON không hợp lệ.';
+                    } else {
+                        $validation = listening_validate_json_payload($payload);
+                        if (!$validation['ok']) {
+                            $errorMessage = $validation['message'];
+                        } else {
+                            $title = (string) ($payload['title'] ?? $title);
+                            $description = (string) ($payload['description'] ?? $record['description'] ?? '');
+                            $questions = is_array($payload['questions'] ?? null) ? $payload['questions'] : [];
+                            $totalQuestions = count($questions);
+
+                            if ($submitted) {
+                                foreach ($questions as $index => $question) {
+                                    $correctAnswer = (int) ($question['answer'] ?? -1);
+                                    $userAnswer = isset($_POST['q' . $index]) && is_numeric($_POST['q' . $index]) ? (int) $_POST['q' . $index] : -1;
+                                    $isCorrect = $userAnswer === $correctAnswer;
+                                    $questionResults[$index] = [
+                                        'question' => trim((string) ($question['question'] ?? '')),
+                                        'options' => is_array($question['options'] ?? null) ? $question['options'] : [],
+                                        'userAnswer' => $userAnswer,
+                                        'correctAnswer' => $correctAnswer,
+                                        'isCorrect' => $isCorrect,
+                                        'explanation' => trim((string) ($question['explanation'] ?? '')), 
+                                    ];
+                                    if ($isCorrect) {
+                                        $score++;
+                                    }
+                                }
+
+                                $percentage = $totalQuestions > 0 ? ($score / $totalQuestions) * 100 : 0;
+                                $bandScore = listening_band_score($percentage);
+                                if ($percentage >= 80) {
+                                    $feedback = 'Bạn làm tốt! Hãy tiếp tục luyện nghe để giữ vững Band.';
+                                } elseif ($percentage >= 60) {
+                                    $feedback = 'Bạn có nền tảng khá. Tiếp tục luyện nghe chi tiết.';
+                                } elseif ($percentage >= 40) {
+                                    $feedback = 'Bạn đang ở mức trung bình. Cần luyện nghe nhiều hơn.';
+                                } elseif ($percentage >= 20) {
+                                    $feedback = 'Cần luyện nghe cơ bản nhiều hơn để cải thiện.';
+                                } else {
+                                    $feedback = 'Bạn nên luyện nghe từ các bài đơn giản và nghe đều đặn.';
+                                }
+
+                                if ($currentUser && isset($currentUser['id'])) {
+                                    streak_mark_activity($conn, (int) $currentUser['id'], 'listening', 'listening_test', $score, max(1, $totalQuestions), (float) $bandScore, 20);
+                                    $practiceSummary = streak_get_practice_summary($conn, (int) $currentUser['id'], 'listening');
+                                    $attemptId = listening_save_attempt(
+                                        $conn,
+                                        $currentUser,
+                                        $selectedId,
+                                        'listening',
+                                        (string) ($payload['title'] ?? ($record['title'] ?? 'Listening Test')),
+                                        $score,
+                                        $totalQuestions,
+                                        (float) $bandScore,
+                                        $questions,
+                                        $questionResults
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        $stmt = $conn->prepare('SELECT id, title, description, filename, original_name, audio_filename, audio_original_name, created_at FROM skill_uploads WHERE skill = ? ORDER BY created_at DESC, id DESC');
+        if ($stmt) {
+            $skill = 'listening';
+            $stmt->bind_param('s', $skill);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result) {
+                while ($row = $result->fetch_assoc()) {
+                    $items[] = $row;
+                }
+            }
+            $stmt->close();
+        }
+
+        if (empty($items)) {
+            $errorMessage = 'Chưa có bài Listening nào được upload.';
+        }
     }
 }
 ?>
@@ -69,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="vi">
 <head>
     <meta charset="utf-8">
-    <title>Listening Diagnostic Test - eLEARNING</title>
+    <title><?php echo htmlspecialchars($selectedId > 0 ? 'Listening Test' : 'Listening', ENT_QUOTES, 'UTF-8'); ?> - eLEARNING</title>
     <base href="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <link href="img/favicon.ico" rel="icon">
@@ -84,23 +297,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="css/style.css" rel="stylesheet">
 </head>
 <body>
-    <div id="spinner" class="show bg-white position-fixed translate-middle w-100 vh-100 top-50 start-50 d-flex align-items-center justify-content-center">
-        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-            <span class="sr-only">Loading...</span>
-        </div>
-    </div>
-
-        <?php include __DIR__ . '/nav.php'; ?>
+    <?php include __DIR__ . '/nav.php'; ?>
 
     <div class="container-fluid bg-primary py-5 mb-5 page-header">
         <div class="container py-5">
             <div class="row justify-content-center">
                 <div class="col-lg-10 text-center">
-                    <h1 class="display-3 text-white animated slideInDown">Listening Diagnostic Test</h1>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb justify-content-center">
+                    <h1 class="display-3 text-white animated slideInDown">Listening</h1>
+                    <p class="text-white mb-0">Chọn bài Listening đã upload hoặc vào bài để làm.</p>
+                    <nav aria-label="breadcrumb" class="mt-3">
+                        <ol class="breadcrumb justify-content-center mb-0">
                             <li class="breadcrumb-item"><a class="text-white" href="index.php">Home</a></li>
-                            <li class="breadcrumb-item text-white active" aria-current="page">Listening Test</li>
+                            <li class="breadcrumb-item text-white active" aria-current="page">Listening</li>
                         </ol>
                     </nav>
                 </div>
@@ -110,139 +318,115 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="container-xxl py-5">
         <div class="container">
-            <?php if ($bandScore !== null): ?>
-                <div class="row justify-content-center mb-5">
-                    <div class="col-lg-8">
-                        <div class="card border-primary shadow-lg">
-                            <div class="card-body text-center p-5">
-                                <h2 class="card-title text-primary mb-4">Your Band Score</h2>
-                                <div class="display-1 text-primary fw-bold mb-3"><?php echo htmlspecialchars($bandScore, ENT_QUOTES, 'UTF-8'); ?></div>
-                                <div class="row g-3 justify-content-center mb-4 text-start">
-                                    <div class="col-md-4">
-                                        <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Lượt làm bài</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $practiceSummary['attempts'], ENT_QUOTES, 'UTF-8'); ?></div>
-                                        </div>
+            <?php if ($errorMessage !== ''): ?>
+                <div class="row justify-content-center mb-4">
+                    <div class="col-lg-10">
+                        <div class="alert alert-warning border-0 shadow-sm"><?php echo htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8'); ?></div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($selectedId > 0 && $errorMessage === '' && $payload !== null): ?>
+                <div class="row mb-4">
+                    <div class="col-lg-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body p-4">
+                                <h2 class="mb-3"><?php echo htmlspecialchars($title, ENT_QUOTES, 'UTF-8'); ?></h2>
+                                <p class="text-muted mb-4"><?php echo htmlspecialchars($description, ENT_QUOTES, 'UTF-8'); ?></p>
+                                <?php
+                                    $audioFilename = basename((string) ($record['audio_filename'] ?? ''));
+                                    $audioExt = strtolower(pathinfo($audioFilename, PATHINFO_EXTENSION));
+                                    $audioType = 'audio/mpeg';
+                                    if ($audioExt === 'wav') {
+                                        $audioType = 'audio/wav';
+                                    } elseif ($audioExt === 'ogg') {
+                                        $audioType = 'audio/ogg';
+                                    }
+                                ?>
+                                <audio controls class="w-100 mb-4">
+                                    <source src="uploads/listening/audio/<?php echo rawurlencode($audioFilename); ?>" type="<?php echo htmlspecialchars($audioType, ENT_QUOTES, 'UTF-8'); ?>">
+                                    <?php echo htmlspecialchars('Trình duyệt của bạn không hỗ trợ audio.', ENT_QUOTES, 'UTF-8'); ?>
+                                </audio>
+
+                                <?php if ($submitted && $bandScore !== null): ?>
+                                    <div class="alert alert-success border-0 shadow-sm mb-4">
+                                        <div><strong>Kết quả:</strong> <?php echo htmlspecialchars((string) $score, ENT_QUOTES, 'UTF-8'); ?>/<?php echo htmlspecialchars((string) $totalQuestions, ENT_QUOTES, 'UTF-8'); ?> câu đúng.</div>
+                                        <div><strong>Band score:</strong> <?php echo htmlspecialchars((string) $bandScore, ENT_QUOTES, 'UTF-8'); ?></div>
+                                        <div><?php echo htmlspecialchars($feedback, ENT_QUOTES, 'UTF-8'); ?></div>
                                     </div>
-                                    <div class="col-md-4">
-                                        <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Điểm hiện tại</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $score, ENT_QUOTES, 'UTF-8'); ?>/5</div>
-                                        </div>
+                                <?php endif; ?>
+
+                                <?php if ($submitted && $bandScore !== null): ?>
+                                    <div class="mb-4">
+                                        <?php foreach ($questionResults as $index => $result): ?>
+                                            <div class="card mb-3">
+                                                <div class="card-body">
+                                                    <h5 class="card-title">Câu <?php echo htmlspecialchars((string) ($index + 1), ENT_QUOTES, 'UTF-8'); ?>: <?php echo htmlspecialchars($result['question'], ENT_QUOTES, 'UTF-8'); ?></h5>
+                                                    <div class="mb-2">
+                                                        <span class="badge bg-<?php echo $result['isCorrect'] ? 'success' : 'danger'; ?> me-2"><?php echo $result['isCorrect'] ? 'Đúng' : 'Sai'; ?></span>
+                                                        <strong>Đáp án của bạn:</strong> <?php echo $result['userAnswer'] >= 0 ? htmlspecialchars(listening_option_label($result['userAnswer']), ENT_QUOTES, 'UTF-8') : 'Không chọn'; ?>
+                                                        <?php if ($result['userAnswer'] >= 0 && isset($result['options'][$result['userAnswer']])): ?>
+                                                            - <?php echo htmlspecialchars((string) $result['options'][$result['userAnswer']], ENT_QUOTES, 'UTF-8'); ?>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <div class="mb-2"><strong>Đáp án đúng:</strong> <?php echo htmlspecialchars(listening_option_label($result['correctAnswer']), ENT_QUOTES, 'UTF-8'); ?> - <?php echo htmlspecialchars((string) ($result['options'][$result['correctAnswer']] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+                                                    <?php if ($result['explanation'] !== ''): ?>
+                                                        <div class="text-muted"><strong>Giải thích:</strong> <?php echo htmlspecialchars($result['explanation'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
                                     </div>
-                                    <div class="col-md-4">
-                                        <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Điểm tốt nhất</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $practiceSummary['bestScore'], ENT_QUOTES, 'UTF-8'); ?>/5</div>
+
+                                    <?php if ($attemptId !== null): ?>
+                                        <div class="mb-4">
+                                            <a href="result_detail.php?id=<?php echo htmlspecialchars((string) $attemptId, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-success me-2">Xem trong Bài đã làm</a>
+                                            <a href="listening.php?test_id=<?php echo htmlspecialchars((string) $selectedId, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-primary">Làm lại</a>
                                         </div>
-                                    </div>
-                                </div>
-                                <p class="card-text fs-5 mb-4"><?php echo htmlspecialchars($feedback, ENT_QUOTES, 'UTF-8'); ?></p>
-                                <a href="listening.php" class="btn btn-primary me-2">Retake Test</a>
-                                <a href="index.php" class="btn btn-outline-primary">Back to Home</a>
+                                    <?php endif; ?>
+
+                                <?php else: ?>
+                                    <form method="post" action="listening.php?test_id=<?php echo htmlspecialchars((string) $selectedId, ENT_QUOTES, 'UTF-8'); ?>">
+                                        <?php foreach ($questions as $index => $question): ?>
+                                            <div class="mb-4">
+                                                <h5><?php echo htmlspecialchars('Câu ' . ($index + 1) . ': ' . (string) ($question['question'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></h5>
+                                                <?php $options = is_array($question['options'] ?? null) ? $question['options'] : []; ?>
+                                                <?php foreach ($options as $optIndex => $option): ?>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="q<?php echo (int) $index; ?>" id="q<?php echo (int) $index; ?>_<?php echo (int) $optIndex; ?>" value="<?php echo (int) $optIndex; ?>" required>
+                                                        <label class="form-check-label" for="q<?php echo (int) $index; ?>_<?php echo (int) $optIndex; ?>"><?php echo htmlspecialchars(listening_option_label($optIndex), ENT_QUOTES, 'UTF-8'); ?>. <?php echo htmlspecialchars((string) $option, ENT_QUOTES, 'UTF-8'); ?></label>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endforeach; ?>
+                                        <button class="btn btn-primary py-3 px-5" type="submit">Submit Test</button>
+                                    </form>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
                 </div>
-            <?php else: ?>
-                <div class="row justify-content-center">
-                    <div class="col-lg-8">
-                        <div class="bg-light rounded p-4">
-                            <h3 class="mb-4">Listening Comprehension Quiz</h3>
-                            <p class="alert alert-info"><i class="fa fa-info-circle me-2"></i>Listen carefully to the scenario and answer the questions based on what you hear (text provided below).</p>
-                            
-                            <div class="card mb-4 border-0 shadow-sm">
-                                <div class="card-body">
-                                    <p><strong>Scenario:</strong> A conversation at a hotel reception desk</p>
-                                    <p><em>"Good morning. I'd like to check in, please. My name is John Smith, and I have a reservation for three nights. Could you tell me what time breakfast is served? It usually starts at 7 AM in most hotels. Yes, breakfast is from 6:30 AM to 10 AM. There's also a restaurant on the second floor if you need lunch. Your room is 305, and here's your key. Welcome!"</em></p>
+            <?php elseif ($selectedId <= 0): ?>
+                <div class="row g-4">
+                    <?php foreach ($items as $item): ?>
+                        <div class="col-lg-6">
+                            <div class="card h-100 shadow-sm border-0">
+                                <div class="card-body p-4">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <h4 class="card-title mb-2"><?php echo htmlspecialchars((string) ($item['title'] ?: 'Listening Test'), ENT_QUOTES, 'UTF-8'); ?></h4>
+                                            <p class="text-muted mb-0"><?php echo htmlspecialchars((string) $item['description'], ENT_QUOTES, 'UTF-8'); ?></p>
+                                        </div>
+                                        <span class="badge bg-primary">#<?php echo htmlspecialchars((string) $item['id'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                    </div>
+                                    <div class="small text-muted mb-2">File đề: <?php echo htmlspecialchars((string) ($item['original_name'] ?: $item['filename']), ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <div class="small text-muted mb-4">Audio: <?php echo htmlspecialchars((string) ($item['audio_original_name'] ?: $item['audio_filename']), ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <div class="small text-muted mb-4">Uploaded: <?php echo htmlspecialchars((string) $item['created_at'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <a href="listening.php?test_id=<?php echo htmlspecialchars((string) $item['id'], ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-primary">Làm bài</a>
                                 </div>
                             </div>
-
-                            <form method="post" action="listening.php">
-                                <div class="mb-4">
-                                    <p><strong>1. What is the guest's name?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_A" value="1_A" required>
-                                        <label class="form-check-label" for="q1_A">A. Jim Smith</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_B" value="1_B">
-                                        <label class="form-check-label" for="q1_B">B. John Smith</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_C" value="1_C">
-                                        <label class="form-check-label" for="q1_C">C. John Scott</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>2. For how many nights is the reservation?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_A" value="2_A" required>
-                                        <label class="form-check-label" for="q2_A">A. Three nights</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_B" value="2_B">
-                                        <label class="form-check-label" for="q2_B">B. Two nights</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_C" value="2_C">
-                                        <label class="form-check-label" for="q2_C">C. Five nights</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>3. What time does breakfast start?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_A" value="3_A" required>
-                                        <label class="form-check-label" for="q3_A">A. 7:00 AM</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_B" value="3_B">
-                                        <label class="form-check-label" for="q3_B">B. 6:30 AM</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_C" value="3_C">
-                                        <label class="form-check-label" for="q3_C">C. 8:00 AM</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>4. When does breakfast end?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_A" value="4_A" required>
-                                        <label class="form-check-label" for="q4_A">A. 9:00 AM</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_B" value="4_B">
-                                        <label class="form-check-label" for="q4_B">B. 9:30 AM</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_C" value="4_C">
-                                        <label class="form-check-label" for="q4_C">C. 10:00 AM</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>5. What is the guest's room number?</strong></p>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_A" value="5_A" required>
-                                        <label class="form-check-label" for="q5_A">A. Room 305</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_B" value="5_B">
-                                        <label class="form-check-label" for="q5_B">B. Room 350</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_C" value="5_C">
-                                        <label class="form-check-label" for="q5_C">C. Room 320</label>
-                                    </div>
-                                </div>
-
-                                <button class="btn btn-primary py-3 px-5" type="submit">Submit Test</button>
-                            </form>
                         </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </div>

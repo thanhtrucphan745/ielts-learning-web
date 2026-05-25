@@ -1,76 +1,174 @@
 <?php
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/streak.php';
 
-auth_start_session();
-$currentUser = auth_user();
-$basePath = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
-$basePath = $basePath === '' ? '/' : $basePath . '/';
-$displayName = $currentUser['name'] ?? ($currentUser['username'] ?? 'User');
-$avatarText = strtoupper(mb_substr($displayName, 0, 1, 'UTF-8'));
-$avatarPath = !empty($currentUser['avatar']) ? $currentUser['avatar'] : '';
-$avatarUrl = $avatarPath !== '' ? $avatarPath : '';
-$role = isset($currentUser['role']) ? (int) $currentUser['role'] : 0;
+require_student();
+$currentUser = auth_user() ?? [];
+$studentId = (int) ($currentUser['id'] ?? 0);
 
-$bandScore = null;
-$feedback = '';
-$score = 0;
-$practiceSummary = [
-    'attempts' => 0,
-    'bestScore' => 0,
-    'latestScore' => 0,
-    'averageScore' => 0,
-    'bestBandScore' => null,
-];
+ensure_skill_uploads_table($conn);
+ensure_speaking_submissions_table($conn);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $correctAnswers = ['1_B', '2_A', '3_C', '4_B', '5_A'];
-    $userAnswers = [
-        isset($_POST['q1']) ? $_POST['q1'] : '',
-        isset($_POST['q2']) ? $_POST['q2'] : '',
-        isset($_POST['q3']) ? $_POST['q3'] : '',
-        isset($_POST['q4']) ? $_POST['q4'] : '',
-        isset($_POST['q5']) ? $_POST['q5'] : ''
-    ];
-    
-    $score = 0;
-    for ($i = 0; $i < 5; $i++) {
-        if ($userAnswers[$i] === $correctAnswers[$i]) {
-            $score++;
+$testId = isset($_GET['test_id']) ? (int) $_GET['test_id'] : 0;
+$test = null;
+$payload = null;
+$message = '';
+$errorMessage = '';
+$answerText = '';
+$allowedAudioExts = ['mp3', 'wav', 'ogg', 'm4a'];
+$uploadsDir = __DIR__ . '/uploads/speaking';
+$submissionDir = $uploadsDir . '/submissions';
+
+if (!is_dir($uploadsDir)) {
+    @mkdir($uploadsDir, 0755, true);
+}
+if (!is_dir($submissionDir)) {
+    @mkdir($submissionDir, 0755, true);
+}
+
+if ($testId > 0) {
+    $stmt = $conn->prepare('SELECT id, title, description, filename, original_name FROM skill_uploads WHERE id = ? AND skill = ? LIMIT 1');
+    if ($stmt) {
+        $skill = 'speaking';
+        $stmt->bind_param('is', $testId, $skill);
+        $stmt->execute();
+        $test = $stmt->get_result()?->fetch_assoc();
+        $stmt->close();
+    }
+
+    if (!$test) {
+        header('Location: speaking.php');
+        exit;
+    }
+
+    $jsonPath = $uploadsDir . '/' . ($test['filename'] ?? '');
+    if (is_file($jsonPath) && is_readable($jsonPath)) {
+        $raw = @file_get_contents($jsonPath);
+        $payload = json_decode((string) $raw, true);
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $answerText = trim((string) ($_POST['answer_text'] ?? ''));
+        $audioFile = $_FILES['audio_file'] ?? null;
+        $audioSelected = $audioFile && isset($audioFile['name']) && $audioFile['error'] !== UPLOAD_ERR_NO_FILE;
+        $audioFilename = null;
+        $audioOriginalName = null;
+        $audioMime = null;
+        $audioSize = null;
+
+        if ($answerText === '' && !$audioSelected) {
+            $errorMessage = 'Bạn phải nhập câu trả lời text hoặc upload audio.';
+        }
+
+        if ($audioSelected && $errorMessage === '') {
+            if ($audioFile['error'] !== UPLOAD_ERR_OK) {
+                $errorMessage = 'Lỗi upload audio. Mã lỗi: ' . (int) $audioFile['error'];
+            } else {
+                $audioExt = strtolower(pathinfo($audioFile['name'], PATHINFO_EXTENSION));
+                if (!in_array($audioExt, $allowedAudioExts, true)) {
+                    $errorMessage = 'Audio chỉ nhận định dạng .mp3, .wav, .ogg hoặc .m4a.';
+                }
+            }
+        }
+
+        if ($errorMessage === '' && $audioSelected) {
+            $safeAudioName = preg_replace('/[^a-zA-Z0-9-_\.]/', '_', basename($audioFile['name']));
+            $randomSuffix = function_exists('random_bytes') ? bin2hex(random_bytes(6)) : uniqid('', true);
+            $targetName = date('Ymd_His') . '_' . $randomSuffix . '_' . $safeAudioName;
+            $targetPath = $submissionDir . '/' . $targetName;
+
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $audioMime = $finfo ? finfo_file($finfo, $audioFile['tmp_name']) : '';
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+
+            if (!move_uploaded_file($audioFile['tmp_name'], $targetPath)) {
+                $errorMessage = 'Không thể lưu file audio, kiểm tra quyền ghi thư mục uploads/speaking/submissions.';
+            } else {
+                $audioFilename = $targetName;
+                $audioOriginalName = $audioFile['name'];
+                $audioSize = (int) $audioFile['size'];
+            }
+        }
+
+        if ($errorMessage === '') {
+            $stmt = $conn->prepare('INSERT INTO speaking_submissions (student_id, test_id, answer_text, audio_filename, audio_original_name, audio_mime, audio_size, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())');
+            if ($stmt) {
+                $status = 'submitted';
+                $stmt->bind_param('iisssssis', $studentId, $testId, $answerText, $audioFilename, $audioOriginalName, $audioMime, $audioSize, $status);
+                if ($stmt->execute()) {
+                    $message = 'Nộp bài thành công, chờ giảng viên chấm.';
+                    $answerText = '';
+                } else {
+                    $errorMessage = 'Không thể lưu bài nộp. Vui lòng thử lại sau.';
+                }
+                $stmt->close();
+            } else {
+                $errorMessage = 'Lỗi cơ sở dữ liệu khi nộp bài.';
+            }
         }
     }
-    
-    $percentage = ($score / 5) * 100;
-    if ($percentage >= 80) {
-        $bandScore = 6;
-        $feedback = 'Excellent! You have strong speaking skills (Band 6). Your speech is fluent and articulate with clear pronunciation, correct grammar, and rich vocabulary. You communicate confidently and coherently.';
-    } elseif ($percentage >= 60) {
-        $bandScore = 5;
-        $feedback = 'Good! You have competent speaking skills (Band 5). Your speech is relatively fluent with generally clear pronunciation and mostly correct grammar. Minor errors may appear. Work on more complex structures.';
-    } elseif ($percentage >= 40) {
-        $bandScore = 4;
-        $feedback = 'Fair! You have basic speaking skills (Band 4). You communicate main ideas but with frequent pauses, unclear pronunciation, and multiple grammar errors. Focus on fluency and vocabulary expansion.';
-    } elseif ($percentage >= 20) {
-        $bandScore = 2;
-        $feedback = 'You need more practice in speaking (Band 2-3). Your speech is very hesitant and hard to understand. Try speaking with a partner or recording yourself daily for gradual improvement.';
-    } else {
-        $bandScore = 0;
-        $feedback = 'Keep practicing! Speaking confidence develops with practice (Band 0-1). We recommend starting with simple conversations and gradually increasing complexity at your own pace.';
+}
+
+$testList = [];
+if ($testId === 0) {
+    $stmt = $conn->prepare('SELECT id, title, description, created_at FROM skill_uploads WHERE skill = ? ORDER BY created_at DESC, id DESC');
+    if ($stmt) {
+        $skill = 'speaking';
+        $stmt->bind_param('s', $skill);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $testList[] = $row;
+            }
+        }
+        $stmt->close();
+    }
+}
+
+function escape_html(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+function render_speaking_part(array $part): string
+{
+    $html = '';
+    $label = isset($part['part']) ? escape_html((string) $part['part']) : 'Part';
+    $html .= '<div class="mb-4">';
+    $html .= '<h5 class="mb-3">' . $label . '</h5>';
+
+    if (isset($part['questions']) && is_array($part['questions']) && !empty($part['questions'])) {
+        $html .= '<div class="mb-3"><strong>Câu hỏi</strong><ol class="ps-3">';
+        foreach ($part['questions'] as $question) {
+            $html .= '<li>' . escape_html((string) $question) . '</li>';
+        }
+        $html .= '</ol></div>';
     }
 
-    if ($currentUser && isset($currentUser['id'])) {
-        streak_mark_activity($conn, (int) $currentUser['id'], 'speaking', 'diagnostic_test', $score, 5, (float) $bandScore, 20);
-        $practiceSummary = streak_get_practice_summary($conn, (int) $currentUser['id'], 'speaking');
+    if (isset($part['cue_card']) && trim((string) $part['cue_card']) !== '') {
+        $html .= '<div class="mb-3"><strong>Cue Card</strong><div class="bg-light border rounded-3 p-3">' . nl2br(escape_html((string) $part['cue_card'])) . '</div></div>';
     }
+
+    if (isset($part['points']) && is_array($part['points']) && !empty($part['points'])) {
+        $html .= '<div class="mb-3"><strong>Points</strong><ul class="ps-3">';
+        foreach ($part['points'] as $point) {
+            $html .= '<li>' . escape_html((string) $point) . '</li>';
+        }
+        $html .= '</ul></div>';
+    }
+
+    $html .= '</div>';
+    return $html;
 }
 ?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8">
-    <title>Speaking Diagnostic Test - eLEARNING</title>
-    <base href="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>">
+    <title>Speaking Assignments - eLEARNING</title>
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <link href="img/favicon.ico" rel="icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -84,23 +182,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="css/style.css" rel="stylesheet">
 </head>
 <body>
-    <div id="spinner" class="show bg-white position-fixed translate-middle w-100 vh-100 top-50 start-50 d-flex align-items-center justify-content-center">
-        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-            <span class="sr-only">Loading...</span>
-        </div>
-    </div>
-
-        <?php include __DIR__ . '/nav.php'; ?>
+    <?php include __DIR__ . '/nav.php'; ?>
 
     <div class="container-fluid bg-primary py-5 mb-5 page-header">
         <div class="container py-5">
             <div class="row justify-content-center">
                 <div class="col-lg-10 text-center">
-                    <h1 class="display-3 text-white animated slideInDown">Speaking Diagnostic Test</h1>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb justify-content-center">
+                    <h1 class="display-3 text-white animated slideInDown">Speaking Assignments</h1>
+                    <p class="text-white mb-0">Chọn đề Speaking để nộp bài qua text hoặc audio.</p>
+                    <nav aria-label="breadcrumb" class="mt-3">
+                        <ol class="breadcrumb justify-content-center mb-0">
                             <li class="breadcrumb-item"><a class="text-white" href="index.php">Home</a></li>
-                            <li class="breadcrumb-item text-white active" aria-current="page">Speaking Test</li>
+                            <li class="breadcrumb-item text-white active" aria-current="page">Speaking</li>
                         </ol>
                     </nav>
                 </div>
@@ -110,136 +203,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="container-xxl py-5">
         <div class="container">
-            <?php if ($bandScore !== null): ?>
-                <div class="row justify-content-center mb-5">
-                    <div class="col-lg-8">
-                        <div class="card border-primary shadow-lg">
-                            <div class="card-body text-center p-5">
-                                <h2 class="card-title text-primary mb-4">Your Band Score</h2>
-                                <div class="display-1 text-primary fw-bold mb-3"><?php echo htmlspecialchars($bandScore, ENT_QUOTES, 'UTF-8'); ?></div>
-                                <div class="row g-3 justify-content-center mb-4 text-start">
-                                    <div class="col-md-4">
-                                        <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Lượt làm bài</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $practiceSummary['attempts'], ENT_QUOTES, 'UTF-8'); ?></div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Điểm hiện tại</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $score, ENT_QUOTES, 'UTF-8'); ?>/5</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="bg-light border rounded-3 p-3 h-100">
-                                            <div class="text-muted small text-uppercase">Điểm tốt nhất</div>
-                                            <div class="h4 mb-0 text-primary"><?php echo htmlspecialchars((string) $practiceSummary['bestScore'], ENT_QUOTES, 'UTF-8'); ?>/5</div>
-                                        </div>
+            <?php if ($testId === 0): ?>
+                <div class="row gy-4">
+                    <?php if (empty($testList)): ?>
+                        <div class="col-12">
+                            <div class="alert alert-secondary">Chưa có đề Speaking nào được đăng tải.</div>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($testList as $item): ?>
+                            <div class="col-lg-6">
+                                <div class="card border-0 shadow-sm h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title"><?php echo escape_html((string) ($item['title'] ?? '')); ?></h5>
+                                        <p class="card-text text-muted"><?php echo escape_html((string) ($item['description'] ?? '')); ?></p>
+                                        <p class="text-muted small mb-3">Đăng tải: <?php echo escape_html((string) ($item['created_at'] ?? '')); ?></p>
+                                        <a href="speaking.php?test_id=<?php echo (int) $item['id']; ?>" class="btn btn-primary">Làm bài</a>
                                     </div>
                                 </div>
-                                <p class="card-text fs-5 mb-4"><?php echo htmlspecialchars($feedback, ENT_QUOTES, 'UTF-8'); ?></p>
-                                <a href="speaking.php" class="btn btn-primary me-2">Retake Test</a>
-                                <a href="index.php" class="btn btn-outline-primary">Back to Home</a>
                             </div>
-                        </div>
-                    </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
                 <div class="row justify-content-center">
-                    <div class="col-lg-8">
-                        <div class="bg-light rounded p-4">
-                            <h3 class="mb-4">Speaking Ability Assessment</h3>
-                            <p class="alert alert-info"><i class="fa fa-info-circle me-2"></i>Answer the following questions. Self-assess your fluency and pronunciation based on the criteria provided.</p>
-                            
-                            <form method="post" action="speaking.php">
-                                <div class="mb-4">
-                                    <p><strong>1. Can you introduce yourself with basic information?</strong></p>
-                                    <small class="form-text text-muted">Consider: Can you say your name, age, and where you're from clearly?</small>
-                                    <div class="form-check mt-2">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_A" value="1_A" required>
-                                        <label class="form-check-label" for="q1_A">A. Not at all, I struggle with basic sentences</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_B" value="1_B">
-                                        <label class="form-check-label" for="q1_B">B. Yes, I can do it clearly and confidently</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q1" id="q1_C" value="1_C">
-                                        <label class="form-check-label" for="q1_C">C. Only with preparation and notes</label>
-                                    </div>
-                                </div>
+                    <div class="col-lg-10">
+                        <?php if ($message !== ''): ?>
+                            <div class="alert alert-success mb-4"><?php echo escape_html($message); ?></div>
+                        <?php endif; ?>
+                        <?php if ($errorMessage !== ''): ?>
+                            <div class="alert alert-danger mb-4"><?php echo escape_html($errorMessage); ?></div>
+                        <?php endif; ?>
 
-                                <div class="mb-4">
-                                    <p><strong>2. How fluent is your English speech?</strong></p>
-                                    <small class="form-text text-muted">Consider: Can you speak smoothly without long pauses?</small>
-                                    <div class="form-check mt-2">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_A" value="2_A" required>
-                                        <label class="form-check-label" for="q2_A">A. I speak smoothly with natural rhythm</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_B" value="2_B">
-                                        <label class="form-check-label" for="q2_B">B. I have frequent pauses and hesitations</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q2" id="q2_C" value="2_C">
-                                        <label class="form-check-label" for="q2_C">C. I struggle to form sentences</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>3. Can you discuss complex topics?</strong></p>
-                                    <small class="form-text text-muted">Consider: Can you talk about opinions, experiences, and ideas?</small>
-                                    <div class="form-check mt-2">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_A" value="3_A" required>
-                                        <label class="form-check-label" for="q3_A">A. No, I only understand simple conversations</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_B" value="3_B">
-                                        <label class="form-check-label" for="q3_B">B. Only about familiar topics with difficulty</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q3" id="q3_C" value="3_C">
-                                        <label class="form-check-label" for="q3_C">C. Yes, I can discuss various topics with confidence</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>4. How is your pronunciation?</strong></p>
-                                    <small class="form-text text-muted">Consider: Can native speakers understand you?</small>
-                                    <div class="form-check mt-2">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_A" value="4_A" required>
-                                        <label class="form-check-label" for="q4_A">A. Hard to understand; many mispronunciations</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_B" value="4_B">
-                                        <label class="form-check-label" for="q4_B">B. Generally clear and understandable</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q4" id="q4_C" value="4_C">
-                                        <label class="form-check-label" for="q4_C">C. Native-like with good accent</label>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <p><strong>5. Can you participate in spontaneous conversations?</strong></p>
-                                    <small class="form-text text-muted">Consider: Can you respond to unexpected questions quickly?</small>
-                                    <div class="form-check mt-2">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_A" value="5_A" required>
-                                        <label class="form-check-label" for="q5_A">A. Yes, I respond spontaneously and confidently</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_B" value="5_B">
-                                        <label class="form-check-label" for="q5_B">B. Only with familiar questions; unexpected topics confuse me</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="q5" id="q5_C" value="5_C">
-                                        <label class="form-check-label" for="q5_C">C. I need time to think before responding</label>
-                                    </div>
-                                </div>
-
-                                <button class="btn btn-primary py-3 px-5" type="submit">Submit Test</button>
-                            </form>
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body">
+                                <h2 class="mb-3"><?php echo escape_html((string) ($test['title'] ?? '')); ?></h2>
+                                <p class="text-muted"><?php echo escape_html((string) ($test['description'] ?? '')); ?></p>
+                                <hr>
+                                <?php if (!is_array($payload)): ?>
+                                    <div class="alert alert-warning">Không thể đọc nội dung đề. Vui lòng báo quản trị.</div>
+                                <?php else: ?>
+                                    <?php foreach ($payload['parts'] as $part): ?>
+                                        <?php echo render_speaking_part(is_array($part) ? $part : []); ?>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
                         </div>
+
+                        <form method="post" enctype="multipart/form-data" class="card border-0 shadow-sm p-4">
+                            <div class="mb-4">
+                                <label class="form-label">Câu trả lời (text)</label>
+                                <textarea name="answer_text" rows="6" class="form-control" placeholder="Nhập câu trả lời của bạn ở đây..."><?php echo escape_html($answerText); ?></textarea>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Upload audio (tùy chọn)</label>
+                                <input type="file" name="audio_file" class="form-control" accept=".mp3,.wav,.ogg,.m4a,audio/*" />
+                                <div class="form-text">Audio tùy chọn. Nếu có, hệ thống sẽ lưu và giảng viên có thể nghe.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit Speaking</button>
+                            <a href="speaking.php" class="btn btn-outline-secondary ms-2">Quay lại danh sách</a>
+                        </form>
                     </div>
                 </div>
             <?php endif; ?>
@@ -259,7 +281,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <a href="#" class="btn btn-lg btn-primary btn-lg-square back-to-top"><i class="bi bi-arrow-up"></i></a>
-
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/main.js"></script>

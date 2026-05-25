@@ -112,8 +112,12 @@ function nav_active($paths) {
                         <span class="fw-bold text-dark">Hi, <?php echo htmlspecialchars($currentUser['name'] ?? $currentUser['username'] ?? 'User', ENT_QUOTES, 'UTF-8'); ?></span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li class="dropdown-header text-uppercase text-muted small"><?php echo htmlspecialchars(auth_role_label((int) ($currentUser['role'] ?? 0)), ENT_QUOTES, 'UTF-8'); ?></li>
                         <li><a class="dropdown-item" href="profile.php"><i class="fas fa-user-circle me-2 text-primary"></i>Hồ sơ cá nhân</a></li>
-                        <li><a class="dropdown-item" href="practice.php"><i class="fas fa-list-alt me-2 text-primary"></i>Quản lý tin đăng</a></li>
+                        <?php if ((int) ($currentUser['role'] ?? 0) === 2): ?>
+                            <li><a class="dropdown-item" href="my_results.php"><i class="fas fa-book-open me-2 text-primary"></i>Bài đã làm</a></li>
+                            <li><a class="dropdown-item" href="my_speaking_results.php"><i class="fas fa-microphone me-2 text-primary"></i>Kết quả Speaking</a></li>
+                        <?php endif; ?>
                         <li><span class="dropdown-item-text"><i class="fas fa-fire me-2 text-warning"></i>Chuỗi học: <?php echo (int) $streakStatus['currentStreak']; ?> ngày</span></li>
                         <?php if ((int) ($currentUser['role'] ?? 0) === 1): ?>
                             <li><hr class="dropdown-divider"></li>
